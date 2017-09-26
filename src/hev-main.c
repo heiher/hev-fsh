@@ -70,8 +70,8 @@ main (int argc, char *argv[])
 		}
 	}
 
-	/* redirect log */
-	if (log) {
+	/* redirect log for server */
+	if (log && !server_address) {
 		int fd;
 
 		fd = open (log, O_CREAT | O_APPEND | O_WRONLY, 0644);
