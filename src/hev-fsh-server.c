@@ -19,6 +19,7 @@
 
 #include "hev-fsh-server.h"
 #include "hev-fsh-server-session.h"
+#include "hev-fsh-task-io.h"
 #include "hev-memory-allocator.h"
 #include "hev-task.h"
 
@@ -153,19 +154,13 @@ hev_fsh_server_stop (HevFshServer *self)
 }
 
 static int
-task_socket_accept (int fd, struct sockaddr *addr, socklen_t *addr_len, HevFshServer *self)
+fsh_task_io_yielder (HevTaskYieldType type, void *data)
 {
-	int new_fd;
-retry:
-	new_fd = accept (fd, addr, addr_len);
-	if (new_fd == -1 && errno == EAGAIN) {
-		hev_task_yield (HEV_TASK_WAITIO);
-		if (self->quit)
-			return -2;
-		goto retry;
-	}
+	HevFshServer *self = data;
 
-	return new_fd;
+	hev_task_yield (type);
+
+	return (self->quit) ? -1 : 0;
 }
 
 static void
@@ -183,8 +178,9 @@ hev_fsh_server_task_entry (void *data)
 		socklen_t addr_len = sizeof (addr);
 		HevFshServerSession *session;
 
-		client_fd = task_socket_accept (self->fd, in_addr, &addr_len, self);
-		if (-1 == client_fd) {
+		client_fd = hev_fsh_task_io_socket_accept (self->fd, in_addr, &addr_len,
+					fsh_task_io_yielder, self);
+		if (client_fd < 0) {
 			fprintf (stderr, "Accept failed!\n");
 			continue;
 		} else if (-2 == client_fd) {
