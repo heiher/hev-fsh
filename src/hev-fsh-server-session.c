@@ -283,6 +283,7 @@ fsh_server_do_login (HevFshServerSession *self)
 	getpeername (self->client_fd, (struct sockaddr *) &addr, &addr_len);
 	printf ("[LOGIN]   Client: %s:%d Token: %s\n", inet_ntoa (addr.sin_addr),
 				ntohs (addr.sin_port), token_str);
+	fflush (stdout);
 
 	return STEP_WRITE_MESSAGE_TOKEN;
 }
@@ -370,6 +371,7 @@ fsh_server_write_message_connect (HevFshServerSession *self)
 	getpeername (self->client_fd, (struct sockaddr *) &addr, &addr_len);
 	printf ("[CONNECT] Client: %s:%d Token: %s\n", inet_ntoa (addr.sin_addr),
 				ntohs (addr.sin_port), token_str);
+	fflush (stdout);
 
 	if (!session)
 		return STEP_CLOSE_SESSION;
