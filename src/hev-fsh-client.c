@@ -18,6 +18,7 @@
 #include <sys/wait.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
+#include <termios.h>
 #include <pwd.h>
 #include <pty.h>
 
@@ -545,6 +546,7 @@ hev_fsh_client_connect_task_entry (void *data)
 	HevFshClient *self = data;
 	HevFshMessage message;
 	HevFshMessageToken message_token;
+	struct termios term, term_rsh;
 	ssize_t len;
 
 	hev_task_add_fd (task, self->fd, EPOLLIN | EPOLLOUT);
@@ -579,7 +581,18 @@ hev_fsh_client_connect_task_entry (void *data)
 	hev_task_add_fd (task, 0, EPOLLIN);
 	hev_task_add_fd (task, 1, EPOLLOUT);
 
+	if (tcgetattr (0, &term) == -1)
+		return;
+
+	memcpy (&term_rsh, &term, sizeof (term));
+	term_rsh.c_oflag &= ~(OPOST);
+	term_rsh.c_lflag &= ~(ISIG | ICANON | IEXTEN | ECHO | ECHOE | ECHOK);
+	if (tcsetattr (0, TCSADRAIN, &term_rsh) == -1)
+		return;
+
 	hev_fsh_client_splice (self->fd, 0, 1);
+
+	tcsetattr (0, TCSADRAIN, &term);
 }
 
 static void
