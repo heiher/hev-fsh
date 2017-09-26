@@ -12,7 +12,7 @@ CCFLAGS=-march=$(MARCH) -O3 -Wall -Werror \
 		`pkg-config --cflags uuid`
 LDFLAGS= -L$(THIRDPARTDIR)/hev-task-system/bin -lhev-task-system \
 		`pkg-config --libs uuid` \
-		-pthread
+		-pthread -lutil
 
 SRCDIR=src
 BINDIR=bin
