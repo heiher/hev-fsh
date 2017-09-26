@@ -432,6 +432,9 @@ hev_fsh_client_accept_task_entry (void *data)
 			}
 		}
 
+		if (!getenv ("TERM"))
+			setenv ("TERM", "linux", 1);
+
 		execl (cmd, cmd, NULL);
 
 		exit (0);
