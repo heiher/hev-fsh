@@ -426,8 +426,8 @@ hev_fsh_client_accept_task_entry (void *data)
 					setuid (pwd->pw_uid);
 				}
 			} else {
-				if (setsid () != -1)
-					cmd = "/bin/login";
+				setsid ();
+				cmd = "/bin/login";
 			}
 		}
 
