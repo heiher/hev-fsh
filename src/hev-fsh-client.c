@@ -29,6 +29,7 @@
 #include "hev-task.h"
 
 #define TASK_STACK_SIZE	(64 * 4096)
+#define KEEP_ALIVE_INTERVAL	(30 * 1000)
 
 typedef struct _HevFshClientAccept HevFshClientAccept;
 
@@ -293,7 +294,7 @@ hev_fsh_client_forward_task_entry (void *data)
 	for (;;) {
 		HevFshClientAccept *accept;
 
-		hev_task_sleep (30 * 1000);
+		hev_task_sleep (KEEP_ALIVE_INTERVAL);
 
 		len = recv (self->fd, &message, sizeof (message), MSG_PEEK);
 		if (len == -1 && errno == EAGAIN) {
