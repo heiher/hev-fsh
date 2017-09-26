@@ -12,6 +12,8 @@
 #include <unistd.h>
 #include <string.h>
 #include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
 
 #include "hev-fsh-server-session.h"
 #include "hev-fsh-protocol.h"
@@ -270,7 +272,17 @@ fsh_server_read_message (HevFshServerSession *self)
 static int
 fsh_server_do_login (HevFshServerSession *self)
 {
+	char token_str[40];
+	struct sockaddr_in addr;
+	socklen_t addr_len = sizeof (addr);
+
 	hev_fsh_protocol_token_generate (self->token);
+	hev_fsh_protocol_token_to_string (self->token, token_str);
+
+	memset (&addr, 0, sizeof (addr));
+	getpeername (self->client_fd, (struct sockaddr *) &addr, &addr_len);
+	printf ("[LOGIN]   Client: %s:%d Token: %s\n", inet_ntoa (addr.sin_addr),
+				ntohs (addr.sin_port), token_str);
 
 	return STEP_WRITE_MESSAGE_TOKEN;
 }
@@ -329,6 +341,9 @@ fsh_server_write_message_connect (HevFshServerSession *self)
 	HevFshMessageToken message_token;
 	struct msghdr mh;
 	struct iovec iov[2];
+	char token_str[40];
+	struct sockaddr_in addr;
+	socklen_t addr_len = sizeof (addr);
 
 	for (session=self->base.prev; session; session=session->prev) {
 		HevFshServerSession *fs_session = (HevFshServerSession *) session;
@@ -348,6 +363,13 @@ fsh_server_write_message_connect (HevFshServerSession *self)
 				break;
 		}
 	}
+
+	hev_fsh_protocol_token_to_string (self->token, token_str);
+
+	memset (&addr, 0, sizeof (addr));
+	getpeername (self->client_fd, (struct sockaddr *) &addr, &addr_len);
+	printf ("[CONNECT] Client: %s:%d Token: %s\n", inet_ntoa (addr.sin_addr),
+				ntohs (addr.sin_port), token_str);
 
 	if (!session)
 		return STEP_CLOSE_SESSION;
