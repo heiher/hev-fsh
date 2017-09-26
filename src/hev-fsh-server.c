@@ -92,7 +92,7 @@ hev_fsh_server_new (const char *address, unsigned int port)
 
 	self = hev_malloc0 (sizeof (HevFshServer));
 	if (!self) {
-		fprintf (stderr, "Allocate worker failed!\n");
+		fprintf (stderr, "Allocate server failed!\n");
 		return NULL;
 	}
 
@@ -101,7 +101,7 @@ hev_fsh_server_new (const char *address, unsigned int port)
 
 	self->task_worker = hev_task_new (8192);
 	if (!self->task_worker) {
-		fprintf (stderr, "Create worker's task failed!\n");
+		fprintf (stderr, "Create server's task failed!\n");
 		hev_free (self);
 		return NULL;
 	}
