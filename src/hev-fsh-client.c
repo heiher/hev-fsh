@@ -24,9 +24,9 @@
 
 #include "hev-fsh-client.h"
 #include "hev-fsh-protocol.h"
-#include "hev-fsh-task-io.h"
 #include "hev-memory-allocator.h"
 #include "hev-task.h"
+#include "hev-task-io-socket.h"
 
 #define TASK_STACK_SIZE	(64 * 4096)
 #define KEEP_ALIVE_INTERVAL	(30 * 1000)
@@ -179,7 +179,7 @@ hev_fsh_client_accept_task_entry (void *data)
 
 	hev_task_add_fd (task, sock_fd, EPOLLIN | EPOLLOUT);
 
-	if (hev_fsh_task_io_socket_connect (sock_fd, &accept->address, sizeof (struct sockaddr_in),
+	if (hev_task_io_socket_connect (sock_fd, &accept->address, sizeof (struct sockaddr_in),
 					NULL, NULL) < 0)
 		goto quit_close_fd;
 
@@ -196,7 +196,7 @@ hev_fsh_client_accept_task_entry (void *data)
 	iov[1].iov_base = &message_token;
 	iov[1].iov_len = sizeof (message_token);
 
-	if (hev_fsh_task_io_socket_sendmsg (sock_fd, &mh, MSG_WAITALL, NULL, NULL) <= 0)
+	if (hev_task_io_socket_sendmsg (sock_fd, &mh, MSG_WAITALL, NULL, NULL) <= 0)
 		goto quit_close_fd;
 
 	pid = forkpty (&ptm_fd, NULL, NULL, NULL);
@@ -233,7 +233,7 @@ hev_fsh_client_accept_task_entry (void *data)
 
 	hev_task_add_fd (task, ptm_fd, EPOLLIN | EPOLLOUT);
 
-	hev_fsh_task_io_splice (sock_fd, sock_fd, ptm_fd, ptm_fd, 2048, NULL, NULL);
+	hev_task_io_splice (sock_fd, sock_fd, ptm_fd, ptm_fd, 2048, NULL, NULL);
 
 quit_close_all_fd:
 	close (ptm_fd);
@@ -256,7 +256,7 @@ hev_fsh_client_forward_task_entry (void *data)
 
 	hev_task_add_fd (task, self->fd, EPOLLIN | EPOLLOUT);
 
-	if (hev_fsh_task_io_socket_connect (self->fd, &self->address, sizeof (struct sockaddr_in),
+	if (hev_task_io_socket_connect (self->fd, &self->address, sizeof (struct sockaddr_in),
 					NULL, NULL) < 0)
 	{
 		fprintf (stderr, "Connect to server failed!\n");
@@ -266,13 +266,13 @@ hev_fsh_client_forward_task_entry (void *data)
 	message.ver = 1;
 	message.cmd = HEV_FSH_CMD_LOGIN;
 
-	len = hev_fsh_task_io_socket_send (self->fd, &message, sizeof (message), MSG_WAITALL,
+	len = hev_task_io_socket_send (self->fd, &message, sizeof (message), MSG_WAITALL,
 				NULL, NULL);
 	if (len <= 0)
 		return;
 
 	/* recv message token */
-	len = hev_fsh_task_io_socket_recv (self->fd, &message, sizeof (message), MSG_WAITALL,
+	len = hev_task_io_socket_recv (self->fd, &message, sizeof (message), MSG_WAITALL,
 				NULL, NULL);
 	if (len <= 0)
 		return;
@@ -282,7 +282,7 @@ hev_fsh_client_forward_task_entry (void *data)
 		return;
 	}
 
-	len = hev_fsh_task_io_socket_recv (self->fd, &message_token, sizeof (message_token),
+	len = hev_task_io_socket_recv (self->fd, &message_token, sizeof (message_token),
 				MSG_WAITALL, NULL, NULL);
 	if (len <= 0)
 		return;
@@ -301,7 +301,7 @@ hev_fsh_client_forward_task_entry (void *data)
 			/* keep alive */
 			message.ver = 1;
 			message.cmd = HEV_FSH_CMD_KEEP_ALIVE;
-			len = hev_fsh_task_io_socket_send (self->fd, &message, sizeof (message),
+			len = hev_task_io_socket_send (self->fd, &message, sizeof (message),
 						MSG_WAITALL, NULL, NULL);
 			if (len <= 0)
 				return;
@@ -309,7 +309,7 @@ hev_fsh_client_forward_task_entry (void *data)
 		}
 
 		/* recv message connect */
-		len = hev_fsh_task_io_socket_recv (self->fd, &message, sizeof (message), MSG_WAITALL,
+		len = hev_task_io_socket_recv (self->fd, &message, sizeof (message), MSG_WAITALL,
 					NULL, NULL);
 		if (len <= 0)
 			return;
@@ -317,7 +317,7 @@ hev_fsh_client_forward_task_entry (void *data)
 		if (message.cmd != HEV_FSH_CMD_CONNECT)
 			return;
 
-		len = hev_fsh_task_io_socket_recv (self->fd, &message_token, sizeof (message_token),
+		len = hev_task_io_socket_recv (self->fd, &message_token, sizeof (message_token),
 					MSG_WAITALL, NULL, NULL);
 		if (len <= 0)
 			return;
@@ -350,7 +350,7 @@ hev_fsh_client_connect_task_entry (void *data)
 
 	hev_task_add_fd (task, self->fd, EPOLLIN | EPOLLOUT);
 
-	if (hev_fsh_task_io_socket_connect (self->fd, &self->address, sizeof (struct sockaddr_in),
+	if (hev_task_io_socket_connect (self->fd, &self->address, sizeof (struct sockaddr_in),
 					NULL, NULL) < 0)
 	{
 		fprintf (stderr, "Connect to server failed!\n");
@@ -360,7 +360,7 @@ hev_fsh_client_connect_task_entry (void *data)
 	message.ver = 1;
 	message.cmd = HEV_FSH_CMD_CONNECT;
 
-	len = hev_fsh_task_io_socket_send (self->fd, &message, sizeof (message), MSG_WAITALL,
+	len = hev_task_io_socket_send (self->fd, &message, sizeof (message), MSG_WAITALL,
 				NULL, NULL);
 	if (len <= 0)
 		return;
@@ -371,7 +371,7 @@ hev_fsh_client_connect_task_entry (void *data)
 	}
 
 	/* send message token */
-	len = hev_fsh_task_io_socket_send (self->fd, &message_token, sizeof (message_token),
+	len = hev_task_io_socket_send (self->fd, &message_token, sizeof (message_token),
 				MSG_WAITALL, NULL, NULL);
 	if (len <= 0)
 		return;
@@ -393,7 +393,7 @@ hev_fsh_client_connect_task_entry (void *data)
 	if (tcsetattr (0, TCSADRAIN, &term_rsh) == -1)
 		return;
 
-	hev_fsh_task_io_splice (self->fd, self->fd, 0, 1, 2048, NULL, NULL);
+	hev_task_io_splice (self->fd, self->fd, 0, 1, 2048, NULL, NULL);
 
 	tcsetattr (0, TCSADRAIN, &term);
 }
