@@ -9,8 +9,10 @@ STRIP=$(CROSS_PREFIX)strip
 MARCH:=native
 CCFLAGS=-march=$(MARCH) -O3 -Wall -Werror \
 		-I$(THIRDPARTDIR)/hev-task-system/src \
+		-I$(THIRDPARTDIR)/hev-task-io/include \
 		`pkg-config --cflags uuid`
 LDFLAGS= -L$(THIRDPARTDIR)/hev-task-system/bin -lhev-task-system \
+		-L$(THIRDPARTDIR)/hev-task-io/bin -lhev-task-io \
 		`pkg-config --libs uuid` \
 		-pthread -lutil
 
@@ -20,7 +22,7 @@ BUILDDIR=build
 THIRDPARTDIR=third-part
 
 TARGET=$(BINDIR)/hev-fsh
-THIRDPARTS=$(THIRDPARTDIR)/hev-task-system
+THIRDPARTS=$(THIRDPARTDIR)/hev-task-system $(THIRDPARTDIR)/hev-task-io
 
 CCOBJS=$(wildcard $(SRCDIR)/*.c)
 LDOBJS=$(patsubst $(SRCDIR)%.c,$(BUILDDIR)%.o,$(CCOBJS))
