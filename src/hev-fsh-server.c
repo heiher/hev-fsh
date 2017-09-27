@@ -19,9 +19,9 @@
 
 #include "hev-fsh-server.h"
 #include "hev-fsh-server-session.h"
-#include "hev-fsh-task-io.h"
 #include "hev-memory-allocator.h"
 #include "hev-task.h"
+#include "hev-task-io-socket.h"
 
 #define TIMEOUT		(30 * 1000)
 
@@ -178,7 +178,7 @@ hev_fsh_server_task_entry (void *data)
 		socklen_t addr_len = sizeof (addr);
 		HevFshServerSession *session;
 
-		client_fd = hev_fsh_task_io_socket_accept (self->fd, in_addr, &addr_len,
+		client_fd = hev_task_io_socket_accept (self->fd, in_addr, &addr_len,
 					fsh_task_io_yielder, self);
 		if (client_fd < 0) {
 			fprintf (stderr, "Accept failed!\n");
