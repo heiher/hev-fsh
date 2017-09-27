@@ -15,9 +15,9 @@
 
 #include "hev-fsh-server-session.h"
 #include "hev-fsh-protocol.h"
-#include "hev-fsh-task-io.h"
 #include "hev-memory-allocator.h"
 #include "hev-task.h"
+#include "hev-task-io-socket.h"
 
 #define SESSION_HP	(10)
 #define TASK_STACK_SIZE	(3 * 4096)
@@ -137,7 +137,7 @@ fsh_server_read_message (HevFshServerSession *self)
 	HevFshMessage message;
 	ssize_t len;
 
-	len = hev_fsh_task_io_socket_recv (self->client_fd, &message, sizeof (message),
+	len = hev_task_io_socket_recv (self->client_fd, &message, sizeof (message),
 				MSG_WAITALL, fsh_task_io_yielder, self);
 	if (len <= 0)
 		return STEP_CLOSE_SESSION;
@@ -199,7 +199,7 @@ fsh_server_write_message_token (HevFshServerSession *self)
 	iov[1].iov_base = &message_token;
 	iov[1].iov_len = sizeof (message_token);
 
-	if (hev_fsh_task_io_socket_sendmsg (self->client_fd, &mh, MSG_WAITALL,
+	if (hev_task_io_socket_sendmsg (self->client_fd, &mh, MSG_WAITALL,
 					fsh_task_io_yielder, self) <= 0)
 		return STEP_CLOSE_SESSION;
 
@@ -214,7 +214,7 @@ fsh_server_do_connect (HevFshServerSession *self)
 	HevFshMessageToken message_token;
 	ssize_t len;
 
-	len = hev_fsh_task_io_socket_recv (self->client_fd, &message_token, sizeof (message_token),
+	len = hev_task_io_socket_recv (self->client_fd, &message_token, sizeof (message_token),
 				MSG_WAITALL, fsh_task_io_yielder, self);
 	if (len <= 0)
 		return STEP_CLOSE_SESSION;
@@ -281,7 +281,7 @@ fsh_server_write_message_connect (HevFshServerSession *self)
 	iov[1].iov_len = sizeof (message_token);
 
 	fs_session = (HevFshServerSession *) session;
-	if (hev_fsh_task_io_socket_sendmsg (fs_session->client_fd, &mh, MSG_WAITALL,
+	if (hev_task_io_socket_sendmsg (fs_session->client_fd, &mh, MSG_WAITALL,
 					fsh_task_io_yielder, self) <= 0)
 		return STEP_CLOSE_SESSION;
 
@@ -299,7 +299,7 @@ fsh_server_do_accept (HevFshServerSession *self)
 	HevFshMessageToken message_token;
 	ssize_t len;
 
-	len = hev_fsh_task_io_socket_recv (self->client_fd, &message_token, sizeof (message_token),
+	len = hev_task_io_socket_recv (self->client_fd, &message_token, sizeof (message_token),
 				MSG_WAITALL, fsh_task_io_yielder, self);
 	if (len <= 0)
 		return STEP_CLOSE_SESSION;
@@ -352,7 +352,7 @@ fsh_server_do_splice (HevFshServerSession *self)
 		hev_task_yield (HEV_TASK_WAITIO);
 	}
 
-	hev_fsh_task_io_splice (self->client_fd, self->client_fd, self->remote_fd, self->remote_fd,
+	hev_task_io_splice (self->client_fd, self->client_fd, self->remote_fd, self->remote_fd,
 				2048, fsh_task_io_yielder, self);
 
 	return STEP_CLOSE_SESSION;
