@@ -55,7 +55,6 @@ struct _HevFshClientAccept
 static void hev_fsh_client_accept_task_entry (void *data);
 static void hev_fsh_client_forward_task_entry (void *data);
 static void hev_fsh_client_connect_task_entry (void *data);
-static void signal_handler (int signum);
 
 static int
 hev_fsh_client_socket (void)
@@ -117,7 +116,7 @@ hev_fsh_client_new (const char *address, unsigned int port)
 	addr->sin_addr.s_addr = inet_addr (address);
 	addr->sin_port = htons (port);
 
-	signal (SIGCHLD, signal_handler);
+	signal (SIGCHLD, SIG_IGN);
 
 	return self;
 }
@@ -396,10 +395,4 @@ hev_fsh_client_connect_task_entry (void *data)
 	hev_task_io_splice (self->fd, self->fd, 0, 1, 2048, NULL, NULL);
 
 	tcsetattr (0, TCSADRAIN, &term);
-}
-
-static void
-signal_handler (int signum)
-{
-	waitpid (-1, NULL, WNOHANG);
 }
