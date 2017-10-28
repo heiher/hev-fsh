@@ -12,6 +12,7 @@
 #include <string.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
+#include <time.h>
 
 #include "hev-fsh-server-session.h"
 #include "hev-fsh-protocol.h"
@@ -165,13 +166,20 @@ fsh_server_do_login (HevFshServerSession *self)
 	char token_str[40];
 	struct sockaddr_in addr;
 	socklen_t addr_len = sizeof (addr);
+	time_t rawtime;
+	struct tm *info;
 
 	hev_fsh_protocol_token_generate (self->token);
 	hev_fsh_protocol_token_to_string (self->token, token_str);
 
+	time (&rawtime);
+	info = localtime (&rawtime);
 	memset (&addr, 0, sizeof (addr));
 	getpeername (self->client_fd, (struct sockaddr *) &addr, &addr_len);
-	printf ("[LOGIN]   Client: %s:%d Token: %s\n", inet_ntoa (addr.sin_addr),
+	printf ("[%04d-%02d-%02d %02d:%02d:%02d] [LOGIN]   Client: %s:%d Token: %s\n",
+				1900 + info->tm_year, info->tm_mon, info->tm_mday,
+				info->tm_hour, info->tm_min, info->tm_sec,
+				inet_ntoa (addr.sin_addr),
 				ntohs (addr.sin_port), token_str);
 	fflush (stdout);
 
@@ -236,6 +244,8 @@ fsh_server_write_message_connect (HevFshServerSession *self)
 	char token_str[40];
 	struct sockaddr_in addr;
 	socklen_t addr_len = sizeof (addr);
+	time_t rawtime;
+	struct tm *info;
 
 	for (session=self->base.prev; session; session=session->prev) {
 		HevFshServerSession *fs_session = (HevFshServerSession *) session;
@@ -258,9 +268,14 @@ fsh_server_write_message_connect (HevFshServerSession *self)
 
 	hev_fsh_protocol_token_to_string (self->token, token_str);
 
+	time (&rawtime);
+	info = localtime (&rawtime);
 	memset (&addr, 0, sizeof (addr));
 	getpeername (self->client_fd, (struct sockaddr *) &addr, &addr_len);
-	printf ("[CONNECT] Client: %s:%d Token: %s\n", inet_ntoa (addr.sin_addr),
+	printf ("[%04d-%02d-%02d %02d:%02d:%02d] [CONNECT] Client: %s:%d Token: %s\n",
+				1900 + info->tm_year, info->tm_mon, info->tm_mday,
+				info->tm_hour, info->tm_min, info->tm_sec,
+				inet_ntoa (addr.sin_addr),
 				ntohs (addr.sin_port), token_str);
 	fflush (stdout);
 
