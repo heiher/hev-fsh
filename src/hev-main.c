@@ -28,9 +28,56 @@ static void
 show_help (void)
 {
 	fprintf (stderr, "\tServer: [-a ADDRESS] [-p PORT] [-l LOG]\n");
-	fprintf (stderr, "\tClient Forward: -s ADDRESS [-p PORT] [-u USER]\n");
+	fprintf (stderr, "\tClient Forward: -s ADDRESS [-p PORT] [-u USER] [-r RECONNECT]\n");
 	fprintf (stderr, "\tClient Connect: -s ADDRESS [-p PORT] -c TOKEN\n");
 	fprintf (stderr, "Version: %d.%d.%d\n", MAJOR_VERSION, MINOR_VERSION, MICRO_VERSION);
+}
+
+static void
+server_run (const char *listen_address, unsigned int port)
+{
+	HevFshServer *server;
+
+	server = hev_fsh_server_new (listen_address, port);
+	if (!server) {
+		fprintf (stderr, "Create fsh server failed!\n");
+		return;
+	}
+
+	hev_fsh_server_start (server);
+
+	hev_task_system_run ();
+
+	hev_fsh_server_destroy (server);
+}
+
+static void
+client_forward_run (const char *server_address, unsigned int port,
+			const char *user, int reconnect)
+{
+	do {
+		HevFshClient *client;
+
+		client = hev_fsh_client_new_forward (server_address, port, user);
+
+		hev_task_system_run ();
+
+		hev_fsh_client_destroy (client);
+
+		sleep (1);
+	} while (reconnect);
+}
+
+static void
+client_connect_run (const char *server_address, unsigned int port, const char *token)
+{
+	HevFshClient *client;
+
+	client = hev_fsh_client_new_connect (server_address, port, token);
+
+	hev_task_system_run ();
+
+	hev_fsh_client_destroy (client);
 }
 
 int
@@ -43,8 +90,9 @@ main (int argc, char *argv[])
 	const char *log = NULL;
 	const char *user = NULL;
 	const char *token = NULL;
+	int reconnect = 0;
 
-	while ((opt = getopt(argc, argv, "a:p:s:l:u:c:")) != -1) {
+	while ((opt = getopt(argc, argv, "a:p:s:l:u:c:r")) != -1) {
 		switch (opt) {
 		case 'a':
 			listen_address = optarg;
@@ -63,6 +111,9 @@ main (int argc, char *argv[])
 			break;
 		case 'c':
 			token = optarg;
+			break;
+		case 'r':
+			reconnect = 1;
 			break;
 		default: /* '?' */
 			show_help ();
@@ -96,31 +147,13 @@ main (int argc, char *argv[])
 		return -1;
 	}
 
-	if (!server_address) {
-		HevFshServer *server;
-
-		server = hev_fsh_server_new (listen_address, port);
-		if (!server) {
-			fprintf (stderr, "Create fsh server failed!\n");
-			return -1;
-		}
-
-		hev_fsh_server_start (server);
-
-		hev_task_system_run ();
-
-		hev_fsh_server_destroy (server);
-	} else {
-		HevFshClient *client;
-
+	if (server_address) {
 		if (token)
-			client = hev_fsh_client_new_connect (server_address, port, token);
+			client_connect_run (server_address, port, token);
 		else
-			client = hev_fsh_client_new_forward (server_address, port, user);
-
-		hev_task_system_run ();
-
-		hev_fsh_client_destroy (client);
+			client_forward_run (server_address, port, user, reconnect);
+	} else {
+		server_run (listen_address, port);
 	}
 
 	hev_task_system_fini ();
