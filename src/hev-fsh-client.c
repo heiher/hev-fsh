@@ -212,7 +212,12 @@ hev_fsh_client_accept_task_entry (void *data)
 	if (pid == -1) {
 		goto quit_close_fd;
 	} else if (pid == 0) {
-		const char *cmd = "/bin/sh";
+		const char *sh = "/bin/sh";
+		const char *bash = "/bin/bash";
+		const char *cmd = bash;
+
+		if (access (bash, X_OK) < 0)
+			cmd = sh;
 
 		if (getuid () == 0) {
 			if (accept->user) {
