@@ -28,7 +28,7 @@ static void
 show_help (void)
 {
 	fprintf (stderr, "\tServer: [-a ADDRESS] [-p PORT] [-l LOG]\n");
-	fprintf (stderr, "\tClient Forward: -s ADDRESS [-p PORT] [-u USER] [-r RECONNECT]\n");
+	fprintf (stderr, "\tClient Forward: -s ADDRESS [-p PORT] [-u USER]\n");
 	fprintf (stderr, "\tClient Connect: -s ADDRESS [-p PORT] -c TOKEN\n");
 	fprintf (stderr, "Version: %d.%d.%d\n", MAJOR_VERSION, MINOR_VERSION, MICRO_VERSION);
 }
@@ -52,10 +52,9 @@ server_run (const char *listen_address, unsigned int port)
 }
 
 static void
-client_forward_run (const char *server_address, unsigned int port,
-			const char *user, int reconnect)
+client_forward_run (const char *server_address, unsigned int port, const char *user)
 {
-	do {
+	for (;;) {
 		HevFshClient *client;
 
 		client = hev_fsh_client_new_forward (server_address, port, user);
@@ -65,7 +64,7 @@ client_forward_run (const char *server_address, unsigned int port,
 		hev_fsh_client_destroy (client);
 
 		sleep (1);
-	} while (reconnect);
+	}
 }
 
 static void
@@ -90,7 +89,6 @@ main (int argc, char *argv[])
 	const char *log = NULL;
 	const char *user = NULL;
 	const char *token = NULL;
-	int reconnect = 0;
 
 	while ((opt = getopt(argc, argv, "a:p:s:l:u:c:r")) != -1) {
 		switch (opt) {
@@ -111,9 +109,6 @@ main (int argc, char *argv[])
 			break;
 		case 'c':
 			token = optarg;
-			break;
-		case 'r':
-			reconnect = 1;
 			break;
 		default: /* '?' */
 			show_help ();
@@ -151,7 +146,7 @@ main (int argc, char *argv[])
 		if (token)
 			client_connect_run (server_address, port, token);
 		else
-			client_forward_run (server_address, port, user, reconnect);
+			client_forward_run (server_address, port, user);
 	} else {
 		server_run (listen_address, port);
 	}
