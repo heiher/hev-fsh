@@ -16,6 +16,7 @@
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <sys/wait.h>
+#include <sys/ioctl.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <termios.h>
@@ -167,9 +168,12 @@ hev_fsh_client_accept_task_entry (void *data)
 	HevFshClientAccept *accept = data;
 	HevFshMessage message;
 	HevFshMessageToken message_token;
+	HevFshMessageTermInfo message_term_info;
 	int sock_fd, ptm_fd;
 	struct msghdr mh;
 	struct iovec iov[2];
+	struct winsize win_size;
+	ssize_t len;
 	pid_t pid;
 
 	sock_fd = hev_fsh_client_socket ();
@@ -198,6 +202,12 @@ hev_fsh_client_accept_task_entry (void *data)
 	if (hev_task_io_socket_sendmsg (sock_fd, &mh, MSG_WAITALL, NULL, NULL) <= 0)
 		goto quit_close_fd;
 
+	/* recv message term info */
+	len = hev_task_io_socket_recv (sock_fd, &message_term_info, sizeof (message_term_info),
+				MSG_WAITALL, NULL, NULL);
+	if (len <= 0)
+		return;
+
 	pid = forkpty (&ptm_fd, NULL, NULL, NULL);
 	if (pid == -1) {
 		goto quit_close_fd;
@@ -225,6 +235,13 @@ hev_fsh_client_accept_task_entry (void *data)
 		execl (cmd, cmd, NULL);
 
 		exit (0);
+	} else {
+		win_size.ws_row = message_term_info.rows;
+		win_size.ws_col = message_term_info.columns;
+		win_size.ws_xpixel = 0;
+		win_size.ws_ypixel = 0;
+
+		ioctl (ptm_fd, TIOCSWINSZ, &win_size);
 	}
 
 	if (fcntl (ptm_fd, F_SETFL, O_NONBLOCK) == -1)
@@ -344,7 +361,9 @@ hev_fsh_client_connect_task_entry (void *data)
 	HevFshClient *self = data;
 	HevFshMessage message;
 	HevFshMessageToken message_token;
+	HevFshMessageTermInfo message_term_info;
 	struct termios term, term_rsh;
+	struct winsize win_size;
 	ssize_t len;
 
 	hev_task_add_fd (task, self->fd, EPOLLIN | EPOLLOUT);
@@ -371,6 +390,18 @@ hev_fsh_client_connect_task_entry (void *data)
 
 	/* send message token */
 	len = hev_task_io_socket_send (self->fd, &message_token, sizeof (message_token),
+				MSG_WAITALL, NULL, NULL);
+	if (len <= 0)
+		return;
+
+	if (ioctl (0, TIOCGWINSZ, &win_size) < 0)
+		return;
+
+	message_term_info.rows = win_size.ws_row;
+	message_term_info.columns = win_size.ws_col;
+
+	/* send message token */
+	len = hev_task_io_socket_send (self->fd, &message_term_info, sizeof (message_term_info),
 				MSG_WAITALL, NULL, NULL);
 	if (len <= 0)
 		return;
