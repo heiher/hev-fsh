@@ -60,8 +60,8 @@ hev_fsh_server_new (const char *address, unsigned int port)
         return NULL;
     }
 
-    ret =
-    setsockopt (fd, SOL_SOCKET, SO_REUSEADDR, &reuseaddr, sizeof (reuseaddr));
+    ret = setsockopt (fd, SOL_SOCKET, SO_REUSEADDR, &reuseaddr,
+                      sizeof (reuseaddr));
     if (ret == -1) {
         fprintf (stderr, "Set reuse address failed!\n");
         close (fd);
@@ -199,7 +199,7 @@ hev_fsh_server_task_entry (void *data)
         }
 
         session =
-        hev_fsh_server_session_new (client_fd, session_close_handler, self);
+            hev_fsh_server_session_new (client_fd, session_close_handler, self);
         if (!session) {
             close (client_fd);
             continue;
