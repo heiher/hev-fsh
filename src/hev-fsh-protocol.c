@@ -14,17 +14,17 @@
 void
 hev_fsh_protocol_token_generate (HevFshToken token)
 {
-	uuid_generate_random (token);
+    uuid_generate_random (token);
 }
 
 void
 hev_fsh_protocol_token_to_string (HevFshToken token, char *out)
 {
-	uuid_unparse (token, out);
+    uuid_unparse (token, out);
 }
 
 int
 hev_fsh_protocol_token_from_string (HevFshToken token, const char *str)
 {
-	return uuid_parse (str, token);
+    return uuid_parse (str, token);
 }
