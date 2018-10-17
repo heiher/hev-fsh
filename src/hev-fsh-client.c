@@ -182,8 +182,9 @@ hev_fsh_client_accept_task_entry (void *data)
 
     hev_task_add_fd (task, sock_fd, EPOLLIN | EPOLLOUT);
 
-    if (hev_task_io_socket_connect (
-        sock_fd, &accept->address, sizeof (struct sockaddr_in), NULL, NULL) < 0)
+    if (hev_task_io_socket_connect (sock_fd, &accept->address,
+                                    sizeof (struct sockaddr_in), NULL,
+                                    NULL) < 0)
         goto quit_close_fd;
 
     message.ver = 1;
@@ -304,8 +305,9 @@ hev_fsh_client_forward_task_entry (void *data)
         return;
     }
 
-    len = hev_task_io_socket_recv (
-    self->fd, &message_token, sizeof (message_token), MSG_WAITALL, NULL, NULL);
+    len = hev_task_io_socket_recv (self->fd, &message_token,
+                                   sizeof (message_token), MSG_WAITALL, NULL,
+                                   NULL);
     if (len <= 0)
         return;
 
@@ -397,8 +399,9 @@ hev_fsh_client_connect_task_entry (void *data)
     }
 
     /* send message token */
-    len = hev_task_io_socket_send (
-    self->fd, &message_token, sizeof (message_token), MSG_WAITALL, NULL, NULL);
+    len = hev_task_io_socket_send (self->fd, &message_token,
+                                   sizeof (message_token), MSG_WAITALL, NULL,
+                                   NULL);
     if (len <= 0)
         return;
 
