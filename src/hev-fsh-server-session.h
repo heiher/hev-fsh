@@ -26,7 +26,7 @@ struct _HevFshServerSessionBase
 };
 
 HevFshServerSession *hev_fsh_server_session_new (
-int client_fd, HevFshServerSessionCloseNotify notify, void *notify_data);
+    int client_fd, HevFshServerSessionCloseNotify notify, void *notify_data);
 
 HevFshServerSession *hev_fsh_server_session_ref (HevFshServerSession *self);
 void hev_fsh_server_session_unref (HevFshServerSession *self);
