@@ -59,6 +59,7 @@ struct _HevFshServerSession
     int ref_count;
 
     int type;
+    int msg_ver;
     HevFshToken token;
 
     HevFshServerSessionCloseNotify notify;
@@ -160,6 +161,13 @@ fsh_server_find_session_by_token (HevFshServerSession *self, HevFshToken token)
     return session;
 }
 
+static void
+sleep_wait (unsigned int milliseconds)
+{
+    while (milliseconds)
+        milliseconds = hev_task_sleep (milliseconds);
+}
+
 static int
 fsh_server_read_message (HevFshServerSession *self)
 {
@@ -171,8 +179,7 @@ fsh_server_read_message (HevFshServerSession *self)
     if (len <= 0)
         return STEP_CLOSE_SESSION;
 
-    if (message.ver != 1)
-        return STEP_CLOSE_SESSION;
+    self->msg_ver = message.ver;
 
     switch (message.cmd) {
     case HEV_FSH_CMD_LOGIN:
@@ -197,13 +204,34 @@ fsh_server_do_login (HevFshServerSession *self)
     time_t rawtime;
     struct tm *info;
 
-    hev_fsh_protocol_token_generate (self->token);
-    hev_fsh_protocol_token_to_string (self->token, token_str);
+    if (1 == self->msg_ver) {
+        hev_fsh_protocol_token_generate (self->token);
+    } else {
+        HevFshMessageToken msg_token;
+        HevFshToken zero_token = { 0 };
+        ssize_t len;
+
+        sleep_wait (1500);
+        len = hev_task_io_socket_recv (self->client_fd, &msg_token,
+                                       sizeof (msg_token), MSG_WAITALL,
+                                       fsh_task_io_yielder, self);
+        if (len <= 0)
+            return STEP_CLOSE_SESSION;
+
+        if (0 == memcmp (zero_token, msg_token.token, sizeof (HevFshToken))) {
+            hev_fsh_protocol_token_generate (self->token);
+        } else if (fsh_server_find_session_by_token (self, msg_token.token)) {
+            hev_fsh_protocol_token_generate (self->token);
+        } else {
+            memcpy (self->token, msg_token.token, sizeof (HevFshToken));
+        }
+    }
 
     time (&rawtime);
     info = localtime (&rawtime);
     memset (&addr, 0, sizeof (addr));
     getpeername (self->client_fd, (struct sockaddr *)&addr, &addr_len);
+    hev_fsh_protocol_token_to_string (self->token, token_str);
     printf (
         "[%04d-%02d-%02d %02d:%02d:%02d] [LOGIN]   Client: %s:%d Token: %s\n",
         1900 + info->tm_year, info->tm_mon, info->tm_mday, info->tm_hour,
