@@ -133,6 +133,33 @@ fsh_task_io_yielder (HevTaskYieldType type, void *data)
     return (self->base.hp > 0) ? 0 : -1;
 }
 
+static HevFshServerSessionBase *
+fsh_server_find_session_by_token (HevFshServerSession *self, HevFshToken token)
+{
+    HevFshServerSessionBase *session;
+
+    for (session = self->base.prev; session; session = session->prev) {
+        HevFshServerSession *fs_session = (HevFshServerSession *)session;
+
+        if (fs_session->type != TYPE_FORWARD)
+            continue;
+        if (memcmp (token, fs_session->token, sizeof (HevFshToken)) == 0)
+            break;
+    }
+    if (!session) {
+        for (session = self->base.next; session; session = session->next) {
+            HevFshServerSession *fs_session = (HevFshServerSession *)session;
+
+            if (fs_session->type != TYPE_FORWARD)
+                continue;
+            if (memcmp (token, fs_session->token, sizeof (HevFshToken)) == 0)
+                break;
+        }
+    }
+
+    return session;
+}
+
 static int
 fsh_server_read_message (HevFshServerSession *self)
 {
@@ -249,32 +276,11 @@ fsh_server_write_message_connect (HevFshServerSession *self)
     time_t rawtime;
     struct tm *info;
 
-    for (session = self->base.prev; session; session = session->prev) {
-        HevFshServerSession *fs_session = (HevFshServerSession *)session;
-
-        if (fs_session->type != TYPE_FORWARD)
-            continue;
-        if (memcmp (self->token, fs_session->token, sizeof (HevFshToken)) == 0)
-            break;
-    }
-    if (!session) {
-        for (session = self->base.next; session; session = session->next) {
-            HevFshServerSession *fs_session = (HevFshServerSession *)session;
-
-            if (fs_session->type != TYPE_FORWARD)
-                continue;
-            if (memcmp (self->token, fs_session->token, sizeof (HevFshToken)) ==
-                0)
-                break;
-        }
-    }
-
-    hev_fsh_protocol_token_to_string (self->token, token_str);
-
     time (&rawtime);
     info = localtime (&rawtime);
     memset (&addr, 0, sizeof (addr));
     getpeername (self->client_fd, (struct sockaddr *)&addr, &addr_len);
+    hev_fsh_protocol_token_to_string (self->token, token_str);
     printf (
         "[%04d-%02d-%02d %02d:%02d:%02d] [CONNECT] Client: %s:%d Token: %s\n",
         1900 + info->tm_year, info->tm_mon, info->tm_mday, info->tm_hour,
@@ -282,6 +288,7 @@ fsh_server_write_message_connect (HevFshServerSession *self)
         ntohs (addr.sin_port), token_str);
     fflush (stdout);
 
+    session = fsh_server_find_session_by_token (self, self->token);
     if (!session)
         return STEP_CLOSE_SESSION;
 
