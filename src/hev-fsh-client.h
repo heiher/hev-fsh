@@ -13,7 +13,8 @@
 typedef struct _HevFshClient HevFshClient;
 
 HevFshClient *hev_fsh_client_new_forward (const char *address,
-                                          unsigned int port, const char *user);
+                                          unsigned int port, const char *user,
+                                          const char *token);
 HevFshClient *hev_fsh_client_new_connect (const char *address,
                                           unsigned int port, const char *token);
 void hev_fsh_client_destroy (HevFshClient *self);

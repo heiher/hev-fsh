@@ -124,7 +124,7 @@ hev_fsh_client_new (const char *address, unsigned int port)
 
 HevFshClient *
 hev_fsh_client_new_forward (const char *address, unsigned int port,
-                            const char *user)
+                            const char *user, const char *token)
 {
     HevFshClient *self;
 
@@ -133,6 +133,7 @@ hev_fsh_client_new_forward (const char *address, unsigned int port,
         return NULL;
 
     self->user = user;
+    self->token = token;
     hev_task_run (self->task, hev_fsh_client_forward_task_entry, self);
 
     return self;
@@ -272,10 +273,12 @@ hev_fsh_client_forward_task_entry (void *data)
     HevTask *task = hev_task_self ();
     HevFshClient *self = data;
     HevFshMessage message;
-    HevFshMessageToken message_token;
+    HevFshMessageToken send_token;
+    HevFshMessageToken recv_token;
     HevFshToken token;
     ssize_t len;
     char token_str[40];
+    char *token_src;
 
     hev_task_add_fd (task, self->fd, EPOLLIN | EPOLLOUT);
 
@@ -286,13 +289,27 @@ hev_fsh_client_forward_task_entry (void *data)
         return;
     }
 
-    message.ver = 1;
+    message.ver = self->token ? 2 : 1;
     message.cmd = HEV_FSH_CMD_LOGIN;
 
     len = hev_task_io_socket_send (self->fd, &message, sizeof (message),
                                    MSG_WAITALL, NULL, NULL);
     if (len <= 0)
         return;
+
+    if (self->token) {
+        if (hev_fsh_protocol_token_from_string (send_token.token,
+                                                self->token) == -1) {
+            fprintf (stderr, "Can't parse token!\n");
+            return;
+        }
+
+        len = hev_task_io_socket_send (self->fd, &send_token,
+                                       sizeof (send_token), MSG_WAITALL, NULL,
+                                       NULL);
+        if (len <= 0)
+            return;
+    }
 
     /* recv message token */
     len = hev_task_io_socket_recv (self->fd, &message, sizeof (message),
@@ -305,15 +322,19 @@ hev_fsh_client_forward_task_entry (void *data)
         return;
     }
 
-    len = hev_task_io_socket_recv (self->fd, &message_token,
-                                   sizeof (message_token), MSG_WAITALL, NULL,
-                                   NULL);
+    len = hev_task_io_socket_recv (self->fd, &recv_token, sizeof (recv_token),
+                                   MSG_WAITALL, NULL, NULL);
     if (len <= 0)
         return;
 
-    memcpy (token, message_token.token, sizeof (HevFshToken));
+    memcpy (token, recv_token.token, sizeof (HevFshToken));
     hev_fsh_protocol_token_to_string (token, token_str);
-    printf ("Token: %s\n", token_str);
+    if (0 == memcmp (&send_token, &recv_token, sizeof (HevFshMessageToken))) {
+        token_src = "client";
+    } else {
+        token_src = "server";
+    }
+    printf ("Token: %s (from %s)\n", token_str, token_src);
 
     for (;;) {
         HevFshClientAccept *accept;
@@ -341,13 +362,13 @@ hev_fsh_client_forward_task_entry (void *data)
         if (message.cmd != HEV_FSH_CMD_CONNECT)
             return;
 
-        len = hev_task_io_socket_recv (self->fd, &message_token,
-                                       sizeof (message_token), MSG_WAITALL,
-                                       NULL, NULL);
+        len = hev_task_io_socket_recv (self->fd, &recv_token,
+                                       sizeof (recv_token), MSG_WAITALL, NULL,
+                                       NULL);
         if (len <= 0)
             return;
 
-        if (memcmp (message_token.token, token, sizeof (HevFshToken)) != 0)
+        if (memcmp (recv_token.token, token, sizeof (HevFshToken)) != 0)
             return;
 
         accept = hev_malloc0 (sizeof (HevFshClientAccept));
@@ -355,7 +376,7 @@ hev_fsh_client_forward_task_entry (void *data)
             continue;
 
         accept->user = self->user;
-        memcpy (accept->token, message_token.token, sizeof (HevFshToken));
+        memcpy (accept->token, recv_token.token, sizeof (HevFshToken));
         memcpy (&accept->address, &self->address, sizeof (struct sockaddr_in));
 
         task = hev_task_new (TASK_STACK_SIZE);
