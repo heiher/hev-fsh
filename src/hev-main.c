@@ -28,7 +28,8 @@ static void
 show_help (void)
 {
     fprintf (stderr, "\tServer: [-a ADDRESS] [-p PORT] [-l LOG]\n");
-    fprintf (stderr, "\tClient Forward: -s ADDRESS [-p PORT] [-u USER]\n");
+    fprintf (stderr,
+             "\tClient Forward: -s ADDRESS [-p PORT] [-u USER] [-t TOKEN]\n");
     fprintf (stderr, "\tClient Connect: -s ADDRESS [-p PORT] -c TOKEN\n");
     fprintf (stderr, "Version: %d.%d.%d\n", MAJOR_VERSION, MINOR_VERSION,
              MICRO_VERSION);
@@ -54,12 +55,12 @@ server_run (const char *listen_address, unsigned int port)
 
 static void
 client_forward_run (const char *server_address, unsigned int port,
-                    const char *user)
+                    const char *user, const char *token)
 {
     for (;;) {
         HevFshClient *client;
 
-        client = hev_fsh_client_new_forward (server_address, port, user);
+        client = hev_fsh_client_new_forward (server_address, port, user, token);
 
         hev_task_system_run ();
 
@@ -91,9 +92,10 @@ main (int argc, char *argv[])
     unsigned int port = 6339;
     const char *log = NULL;
     const char *user = NULL;
-    const char *token = NULL;
+    const char *login_token = NULL;
+    const char *connect_token = NULL;
 
-    while ((opt = getopt (argc, argv, "a:p:s:l:u:c:r")) != -1) {
+    while ((opt = getopt (argc, argv, "a:p:s:l:u:c:t:")) != -1) {
         switch (opt) {
         case 'a':
             listen_address = optarg;
@@ -110,8 +112,11 @@ main (int argc, char *argv[])
         case 'u':
             user = optarg;
             break;
+        case 't':
+            login_token = optarg;
+            break;
         case 'c':
-            token = optarg;
+            connect_token = optarg;
             break;
         default: /* '?' */
             show_help ();
@@ -146,10 +151,10 @@ main (int argc, char *argv[])
     }
 
     if (server_address) {
-        if (token)
-            client_connect_run (server_address, port, token);
+        if (connect_token)
+            client_connect_run (server_address, port, connect_token);
         else
-            client_forward_run (server_address, port, user);
+            client_forward_run (server_address, port, user, login_token);
     } else {
         server_run (listen_address, port);
     }
