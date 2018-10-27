@@ -324,7 +324,7 @@ fsh_server_write_message_connect (HevFshServerSession *self)
     if (!session)
         return STEP_CLOSE_SESSION;
 
-    message.ver = 1;
+    message.ver = self->msg_ver;
     message.cmd = HEV_FSH_CMD_CONNECT;
     memcpy (message_token.token, self->token, sizeof (HevFshToken));
 
