@@ -278,6 +278,7 @@ fsh_server_do_connect (HevFshServerSession *self)
     HevFshMessageToken message_token;
     ssize_t len;
 
+    sleep_wait (1500);
     len = hev_task_io_socket_recv (self->client_fd, &message_token,
                                    sizeof (message_token), MSG_WAITALL,
                                    fsh_task_io_yielder, self);
