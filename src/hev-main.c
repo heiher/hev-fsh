@@ -21,8 +21,8 @@
 #include "hev-fsh-client.h"
 
 #define MAJOR_VERSION (1)
-#define MINOR_VERSION (3)
-#define MICRO_VERSION (1)
+#define MINOR_VERSION (4)
+#define MICRO_VERSION (0)
 
 static void
 show_help (void)
