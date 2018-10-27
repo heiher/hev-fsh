@@ -135,14 +135,15 @@ fsh_task_io_yielder (HevTaskYieldType type, void *data)
 }
 
 static HevFshServerSessionBase *
-fsh_server_find_session_by_token (HevFshServerSession *self, HevFshToken token)
+fsh_server_find_session_by_token (HevFshServerSession *self, int type,
+                                  HevFshToken token)
 {
     HevFshServerSessionBase *session;
 
     for (session = self->base.prev; session; session = session->prev) {
         HevFshServerSession *fs_session = (HevFshServerSession *)session;
 
-        if (fs_session->type != TYPE_FORWARD)
+        if (fs_session->type != type)
             continue;
         if (memcmp (token, fs_session->token, sizeof (HevFshToken)) == 0)
             break;
@@ -151,7 +152,7 @@ fsh_server_find_session_by_token (HevFshServerSession *self, HevFshToken token)
         for (session = self->base.next; session; session = session->next) {
             HevFshServerSession *fs_session = (HevFshServerSession *)session;
 
-            if (fs_session->type != TYPE_FORWARD)
+            if (fs_session->type != type)
                 continue;
             if (memcmp (token, fs_session->token, sizeof (HevFshToken)) == 0)
                 break;
@@ -220,7 +221,8 @@ fsh_server_do_login (HevFshServerSession *self)
 
         if (0 == memcmp (zero_token, msg_token.token, sizeof (HevFshToken))) {
             hev_fsh_protocol_token_generate (self->token);
-        } else if (fsh_server_find_session_by_token (self, msg_token.token)) {
+        } else if (fsh_server_find_session_by_token (self, TYPE_FORWARD,
+                                                     msg_token.token)) {
             hev_fsh_protocol_token_generate (self->token);
         } else {
             memcpy (self->token, msg_token.token, sizeof (HevFshToken));
@@ -317,7 +319,8 @@ fsh_server_write_message_connect (HevFshServerSession *self)
         ntohs (addr.sin_port), token_str);
     fflush (stdout);
 
-    session = fsh_server_find_session_by_token (self, self->token);
+    session =
+        fsh_server_find_session_by_token (self, TYPE_FORWARD, self->token);
     if (!session)
         return STEP_CLOSE_SESSION;
 
@@ -359,27 +362,8 @@ fsh_server_do_accept (HevFshServerSession *self)
     if (len <= 0)
         return STEP_CLOSE_SESSION;
 
-    for (session = self->base.prev; session; session = session->prev) {
-        HevFshServerSession *fs_session = (HevFshServerSession *)session;
-
-        if (fs_session->type != TYPE_CONNECT)
-            continue;
-        if (memcmp (message_token.token, fs_session->token,
-                    sizeof (HevFshToken)) == 0)
-            break;
-    }
-    if (!session) {
-        for (session = self->base.next; session; session = session->next) {
-            HevFshServerSession *fs_session = (HevFshServerSession *)session;
-
-            if (fs_session->type != TYPE_CONNECT)
-                continue;
-            if (memcmp (message_token.token, fs_session->token,
-                        sizeof (HevFshToken)) == 0)
-                break;
-        }
-    }
-
+    session = fsh_server_find_session_by_token (self, TYPE_CONNECT,
+                                                message_token.token);
     if (!session)
         return STEP_CLOSE_SESSION;
 
