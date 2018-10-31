@@ -234,11 +234,10 @@ fsh_server_do_login (HevFshServerSession *self)
     memset (&addr, 0, sizeof (addr));
     getpeername (self->client_fd, (struct sockaddr *)&addr, &addr_len);
     hev_fsh_protocol_token_to_string (self->token, token_str);
-    printf (
-        "[%04d-%02d-%02d %02d:%02d:%02d] [LOGIN]   Client: %s:%d Token: %s\n",
-        1900 + info->tm_year, info->tm_mon, info->tm_mday, info->tm_hour,
-        info->tm_min, info->tm_sec, inet_ntoa (addr.sin_addr),
-        ntohs (addr.sin_port), token_str);
+    printf ("[%04d-%02d-%02d %02d:%02d:%02d] %s:%d L %s\n",
+            1900 + info->tm_year, info->tm_mon, info->tm_mday, info->tm_hour,
+            info->tm_min, info->tm_sec, inet_ntoa (addr.sin_addr),
+            ntohs (addr.sin_port), token_str);
     fflush (stdout);
 
     return STEP_WRITE_MESSAGE_TOKEN;
@@ -312,11 +311,10 @@ fsh_server_write_message_connect (HevFshServerSession *self)
     memset (&addr, 0, sizeof (addr));
     getpeername (self->client_fd, (struct sockaddr *)&addr, &addr_len);
     hev_fsh_protocol_token_to_string (self->token, token_str);
-    printf (
-        "[%04d-%02d-%02d %02d:%02d:%02d] [CONNECT] Client: %s:%d Token: %s\n",
-        1900 + info->tm_year, info->tm_mon, info->tm_mday, info->tm_hour,
-        info->tm_min, info->tm_sec, inet_ntoa (addr.sin_addr),
-        ntohs (addr.sin_port), token_str);
+    printf ("[%04d-%02d-%02d %02d:%02d:%02d] %s:%d C %s\n",
+            1900 + info->tm_year, info->tm_mon, info->tm_mday, info->tm_hour,
+            info->tm_min, info->tm_sec, inet_ntoa (addr.sin_addr),
+            ntohs (addr.sin_port), token_str);
     fflush (stdout);
 
     session =
