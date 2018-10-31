@@ -18,7 +18,8 @@
 #include "hev-main.h"
 #include "hev-task-system.h"
 #include "hev-fsh-server.h"
-#include "hev-fsh-client.h"
+#include "hev-fsh-client-term-forward.h"
+#include "hev-fsh-client-term-connect.h"
 
 #define MAJOR_VERSION (1)
 #define MINOR_VERSION (4)
@@ -54,33 +55,34 @@ server_run (const char *listen_address, unsigned int port)
 }
 
 static void
-client_forward_run (const char *server_address, unsigned int port,
-                    const char *user, const char *token)
+client_term_forward_run (const char *server_address, unsigned int port,
+                         const char *user, const char *token)
 {
     for (;;) {
-        HevFshClient *client;
+        HevFshClientTermForward *client;
 
-        client = hev_fsh_client_new_forward (server_address, port, user, token);
+        client =
+            hev_fsh_client_term_forward_new (server_address, port, user, token);
 
         hev_task_system_run ();
 
-        hev_fsh_client_destroy (client);
+        hev_fsh_client_base_destroy ((HevFshClientBase *)client);
 
         sleep (1);
     }
 }
 
 static void
-client_connect_run (const char *server_address, unsigned int port,
-                    const char *token)
+client_term_connect_run (const char *server_address, unsigned int port,
+                         const char *token)
 {
-    HevFshClient *client;
+    HevFshClientTermConnect *client;
 
-    client = hev_fsh_client_new_connect (server_address, port, token);
+    client = hev_fsh_client_term_connect_new (server_address, port, token);
 
     hev_task_system_run ();
 
-    hev_fsh_client_destroy (client);
+    hev_fsh_client_base_destroy ((HevFshClientBase *)client);
 }
 
 int
@@ -152,9 +154,9 @@ main (int argc, char *argv[])
 
     if (server_address) {
         if (connect_token)
-            client_connect_run (server_address, port, connect_token);
+            client_term_connect_run (server_address, port, connect_token);
         else
-            client_forward_run (server_address, port, user, login_token);
+            client_term_forward_run (server_address, port, user, login_token);
     } else {
         server_run (listen_address, port);
     }
