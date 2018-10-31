@@ -86,7 +86,8 @@ hev_fsh_client_term_forward_task_entry (void *data)
     HevFshMessageToken send_token;
     HevFshMessageToken recv_token;
     HevFshToken token;
-    int sock_fd;
+    int sock_fd, wait_keep_alive = 0;
+    unsigned int sleep_ms = KEEP_ALIVE_INTERVAL;
     ssize_t len;
     char token_str[40];
     char *token_src;
@@ -148,17 +149,24 @@ hev_fsh_client_term_forward_task_entry (void *data)
     printf ("Token: %s (from %s)\n", token_str, token_src);
 
     for (;;) {
-        hev_task_sleep (KEEP_ALIVE_INTERVAL);
+        sleep_ms = hev_task_sleep (sleep_ms);
 
         len = recv (sock_fd, &message, sizeof (message), MSG_PEEK);
         if (len == -1 && errno == EAGAIN) {
+            /* timeout */
+            if (0 == sleep_ms && wait_keep_alive) {
+                printf ("Connection lost!\n");
+                return;
+            }
             /* keep alive */
-            message.ver = 1;
+            message.ver = 2;
             message.cmd = HEV_FSH_CMD_KEEP_ALIVE;
             len = hev_task_io_socket_send (sock_fd, &message, sizeof (message),
                                            MSG_WAITALL, NULL, NULL);
             if (len <= 0)
                 return;
+            wait_keep_alive = 1;
+            sleep_ms = KEEP_ALIVE_INTERVAL;
             continue;
         }
 
@@ -168,8 +176,16 @@ hev_fsh_client_term_forward_task_entry (void *data)
         if (len <= 0)
             return;
 
-        if (message.cmd != HEV_FSH_CMD_CONNECT)
+        switch (message.cmd) {
+        case HEV_FSH_CMD_KEEP_ALIVE:
+            wait_keep_alive = 0;
+            sleep_ms = KEEP_ALIVE_INTERVAL;
+            continue;
+        case HEV_FSH_CMD_CONNECT:
+            break;
+        default:
             return;
+        }
 
         len = hev_task_io_socket_recv (
             sock_fd, &recv_token, sizeof (recv_token), MSG_WAITALL, NULL, NULL);
@@ -182,5 +198,6 @@ hev_fsh_client_term_forward_task_entry (void *data)
         hev_fsh_client_term_accept_new (&self->base.address,
                                         sizeof (struct sockaddr_in), self->user,
                                         &recv_token.token);
+        sleep_ms = KEEP_ALIVE_INTERVAL;
     }
 }
