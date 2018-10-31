@@ -380,6 +380,18 @@ fsh_server_do_accept (HevFshServerSession *self)
 static int
 fsh_server_do_keep_alive (HevFshServerSession *self)
 {
+    HevFshMessage message;
+
+    if (1 != self->msg_ver) {
+        message.ver = 1;
+        message.cmd = HEV_FSH_CMD_KEEP_ALIVE;
+
+        if (hev_task_io_socket_send (self->client_fd, &message,
+                                     sizeof (message), MSG_WAITALL,
+                                     fsh_task_io_yielder, self) <= 0)
+            return STEP_CLOSE_SESSION;
+    }
+
     return STEP_READ_MESSAGE;
 }
 
