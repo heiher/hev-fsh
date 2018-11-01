@@ -94,7 +94,7 @@ hev_fsh_client_port_connect_task_entry (void *data)
                                     sizeof (struct sockaddr_in), NULL,
                                     NULL) < 0) {
         fprintf (stderr, "Connect to server failed!\n");
-        return;
+        goto quit;
     }
 
     message.ver = 1;
@@ -103,12 +103,12 @@ hev_fsh_client_port_connect_task_entry (void *data)
     len = hev_task_io_socket_send (self->base.fd, &message, sizeof (message),
                                    MSG_WAITALL, NULL, NULL);
     if (len <= 0)
-        return;
+        goto quit;
 
     if (hev_fsh_protocol_token_from_string (message_token.token, self->token) ==
         -1) {
         fprintf (stderr, "Can't parse token!\n");
-        return;
+        goto quit;
     }
 
     /* send message token */
@@ -116,13 +116,16 @@ hev_fsh_client_port_connect_task_entry (void *data)
                                    sizeof (message_token), MSG_WAITALL, NULL,
                                    NULL);
     if (len <= 0)
-        return;
+        goto quit;
 
     if (fcntl (self->local_fd, F_SETFL, O_NONBLOCK) == -1)
-        return;
+        goto quit;
 
     hev_task_add_fd (task, self->local_fd, EPOLLIN | EPOLLOUT);
 
     hev_task_io_splice (self->base.fd, self->base.fd, self->local_fd,
                         self->local_fd, 2048, NULL, NULL);
+
+quit:
+    hev_fsh_client_base_destroy ((HevFshClientBase *)self);
 }
