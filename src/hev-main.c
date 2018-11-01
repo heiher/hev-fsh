@@ -23,9 +23,9 @@
 #include "hev-fsh-client-port-forward.h"
 #include "hev-fsh-client-port-listen.h"
 
-#define MAJOR_VERSION (1)
-#define MINOR_VERSION (4)
-#define MICRO_VERSION (1)
+#define MAJOR_VERSION (2)
+#define MINOR_VERSION (0)
+#define MICRO_VERSION (0)
 
 static void
 show_help (void)
