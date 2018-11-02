@@ -33,7 +33,7 @@ struct _HevFshClientPortListen
 static void hev_fsh_client_port_listen_task_entry (void *data);
 static void hev_fsh_client_port_listen_destroy (HevFshClientBase *self);
 
-HevFshClientPortListen *
+HevFshClientBase *
 hev_fsh_client_port_listen_new (HevFshConfig *config)
 {
     HevFshClientPortListen *self;
@@ -80,7 +80,7 @@ hev_fsh_client_port_listen_new (HevFshConfig *config)
 
     hev_task_run (self->task, hev_fsh_client_port_listen_task_entry, self);
 
-    return self;
+    return &self->base;
 }
 
 static void
@@ -99,7 +99,7 @@ hev_fsh_client_port_listen_task_entry (void *data)
 
     for (;;) {
         int fd;
-        HevFshClientPortConnect *client;
+        HevFshClientBase *client;
 
         fd = hev_task_io_socket_accept (self->base.fd, NULL, NULL, NULL, NULL);
         if (0 > fd)
