@@ -27,22 +27,21 @@ struct _HevFshClientPortAccept
 {
     HevFshClientBase base;
 
-    const char *address;
-    unsigned int port;
     HevFshToken token;
 
     HevTask *task;
+    HevFshConfig *config;
 };
 
 static void hev_fsh_client_port_accept_task_entry (void *data);
 static void hev_fsh_client_port_accept_destroy (HevFshClientBase *self);
 
 HevFshClientPortAccept *
-hev_fsh_client_port_accept_new (struct sockaddr *addr, socklen_t addrlen,
-                                const char *address, unsigned int port,
-                                HevFshToken *token)
+hev_fsh_client_port_accept_new (HevFshConfig *config, HevFshToken token)
 {
     HevFshClientPortAccept *self;
+    const char *address;
+    unsigned int port;
 
     self = hev_malloc0 (sizeof (HevFshClientPortAccept));
     if (!self) {
@@ -50,8 +49,10 @@ hev_fsh_client_port_accept_new (struct sockaddr *addr, socklen_t addrlen,
         return NULL;
     }
 
-    if (0 > hev_fsh_client_base_construct_with_sockaddr (&self->base, addr,
-                                                         addrlen)) {
+    address = hev_fsh_config_get_server_address (config);
+    port = hev_fsh_config_get_server_port (config);
+
+    if (0 > hev_fsh_client_base_construct (&self->base, address, port)) {
         fprintf (stderr, "Construct client base failed!\n");
         hev_free (self);
         return NULL;
@@ -64,9 +65,8 @@ hev_fsh_client_port_accept_new (struct sockaddr *addr, socklen_t addrlen,
         return NULL;
     }
 
-    self->address = address;
-    self->port = port;
-    memcpy (&self->token, token, sizeof (HevFshToken));
+    self->config = config;
+    memcpy (self->token, token, sizeof (HevFshToken));
     self->base._destroy = hev_fsh_client_port_accept_destroy;
 
     hev_task_run (self->task, hev_fsh_client_port_accept_task_entry, self);
@@ -87,6 +87,7 @@ hev_fsh_client_port_accept_task_entry (void *data)
     HevFshClientPortAccept *self = data;
     HevFshMessage message;
     HevFshMessageToken message_token;
+    HevFshMessagePortInfo message_port_info;
     int rfd, lfd;
     struct msghdr mh;
     struct iovec iov[2];
@@ -116,6 +117,27 @@ hev_fsh_client_port_accept_task_entry (void *data)
     if (hev_task_io_socket_sendmsg (rfd, &mh, MSG_WAITALL, NULL, NULL) <= 0)
         goto quit;
 
+    /* recv message port info */
+    if (0 > hev_task_io_socket_recv (rfd, &message_port_info,
+                                     sizeof (message_port_info), MSG_WAITALL,
+                                     NULL, NULL))
+        goto quit;
+
+    if (!hev_fsh_config_addr_list_contains (
+            self->config, message_port_info.type, message_port_info.addr,
+            message_port_info.port))
+        goto quit;
+
+    switch (message_port_info.type) {
+    case 4:
+        addr.sin_family = AF_INET;
+        memcpy (&addr.sin_addr, message_port_info.addr, 4);
+        break;
+    default:
+        goto quit;
+    }
+    addr.sin_port = message_port_info.port;
+
     lfd = socket (AF_INET, SOCK_STREAM, 0);
     if (0 > lfd)
         goto quit;
@@ -124,10 +146,6 @@ hev_fsh_client_port_accept_task_entry (void *data)
         goto quit_close_fd;
 
     hev_task_add_fd (task, lfd, EPOLLIN | EPOLLOUT);
-
-    addr.sin_family = AF_INET;
-    addr.sin_addr.s_addr = inet_addr (self->address);
-    addr.sin_port = htons (self->port);
 
     if (0 > hev_task_io_socket_connect (lfd, (struct sockaddr *)&addr,
                                         sizeof (addr), NULL, NULL))
