@@ -36,7 +36,7 @@ struct _HevFshClientPortAccept
 static void hev_fsh_client_port_accept_task_entry (void *data);
 static void hev_fsh_client_port_accept_destroy (HevFshClientBase *self);
 
-HevFshClientPortAccept *
+HevFshClientBase *
 hev_fsh_client_port_accept_new (HevFshConfig *config, HevFshToken token)
 {
     HevFshClientPortAccept *self;
@@ -71,7 +71,7 @@ hev_fsh_client_port_accept_new (HevFshConfig *config, HevFshToken token)
 
     hev_task_run (self->task, hev_fsh_client_port_accept_task_entry, self);
 
-    return self;
+    return &self->base;
 }
 
 static void

@@ -16,7 +16,7 @@
 
 typedef struct _HevFshClientPortAccept HevFshClientPortAccept;
 
-HevFshClientPortAccept *hev_fsh_client_port_accept_new (HevFshConfig *config,
-                                                        HevFshToken token);
+HevFshClientBase *hev_fsh_client_port_accept_new (HevFshConfig *config,
+                                                  HevFshToken token);
 
 #endif /* __HEV_FSH_CLIENT_PORT_ACCEPT_H__ */
