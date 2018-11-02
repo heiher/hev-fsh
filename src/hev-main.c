@@ -11,12 +11,17 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <signal.h>
+#include <string.h>
+#include <fcntl.h>
 #include <sys/types.h>
 #include <sys/stat.h>
-#include <fcntl.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
 
 #include "hev-main.h"
 #include "hev-task-system.h"
+#include "hev-fsh-config.h"
 #include "hev-fsh-server.h"
 #include "hev-fsh-client-term-forward.h"
 #include "hev-fsh-client-term-connect.h"
@@ -30,194 +35,317 @@
 static void
 show_help (void)
 {
-    fprintf (stderr, "\tServer: [-a ADDRESS] [-p PORT] [-l LOG]\n");
-    fprintf (stderr, "\tClient Common: -s ADDRESS [-p PORT]\n");
-    fprintf (stderr, "\t\tTerminal Forward: [-u USER] [-t TOKEN]\n");
-    fprintf (stderr, "\t\tTerminal Connect: -c TOKEN\n");
-    fprintf (stderr, "\t\tTCP Port Forward: -o ADDRESS -x PORT [-t TOKEN]\n");
-    fprintf (stderr, "\t\tTCP Port Connect: -c TOKEN [-o ADDRESS] -x PORT\n");
+    fprintf (stderr,
+             "Server: -s [-l LOG] [SERVER_ADDR:SERVER_PORT]\n"
+             "Terminal:\n"
+             "  Forwarder: -f [-u USER] SERVER_ADDR[:SERVER_PORT/TOKEN]\n"
+             "  Connector: SERVER_ADDR[:SERVER_PORT]/TOKEN\n"
+             "TCP Port:\n"
+             "  Forwarder: -f -p [-w ADDR:PORT,... | -b ADDR:PORT,...] "
+             "SERVER_ADDR[:SERVER_PORT/TOKEN\n"
+             "  Connector: -p [LOCAL_ADDR:]LOCAL_PORT:REMOTE_ADD:REMOTE_PORT "
+             "SERVER_ADDR[:SERVER_PORT]/TOKEN\n");
     fprintf (stderr, "Version: %d.%d.%d\n", MAJOR_VERSION, MINOR_VERSION,
              MICRO_VERSION);
 }
 
 static void
-server_run (const char *lis_addr, unsigned int port)
+parse_addr (const char *str, char **addr, char **port, char **token)
 {
-    HevFshServer *server;
+    char *saveptr;
 
-    server = hev_fsh_server_new (lis_addr, port);
-    if (!server) {
-        fprintf (stderr, "Create fsh server failed!\n");
-        return;
-    }
-
-    hev_fsh_server_start (server);
-
-    hev_task_system_run ();
-
-    hev_fsh_server_destroy (server);
-}
-
-static void
-client_term_forward_run (const char *srv_addr, unsigned int port,
-                         const char *user, const char *token)
-{
-    for (;;) {
-        HevFshClientTermForward *client;
-
-        client = hev_fsh_client_term_forward_new (srv_addr, port, user, token);
-
-        hev_task_system_run ();
-
-        hev_fsh_client_base_destroy ((HevFshClientBase *)client);
-
-        sleep (1);
+    *addr = strtok_r ((char *)str, "/", &saveptr);
+    if (token)
+        *token = strtok_r (NULL, "/", &saveptr);
+    if (*addr) {
+        *addr = strtok_r (*addr, ":", &saveptr);
+        *port = strtok_r (NULL, ":", &saveptr);
     }
 }
 
 static void
-client_term_connect_run (const char *srv_addr, unsigned int port,
-                         const char *token)
+parse_addr_list (HevFshConfig *config, const char *str, int action)
 {
-    HevFshClientTermConnect *client;
+    char *saveptr1;
 
-    client = hev_fsh_client_term_connect_new (srv_addr, port, token);
+    for (;; str = NULL) {
+        char *ap;
+        char *addr;
+        char *port;
+        char *saveptr2;
+        struct in_addr iaddr;
 
-    hev_task_system_run ();
+        ap = strtok_r ((char *)str, ",", &saveptr1);
+        if (!ap)
+            break;
 
-    hev_fsh_client_base_destroy ((HevFshClientBase *)client);
-}
+        addr = strtok_r (ap, ":", &saveptr2);
+        port = strtok_r (NULL, ":", &saveptr2);
+        if (!addr || !port)
+            continue;
 
-static void
-client_port_forward_run (const char *srv_addr, unsigned int srv_port,
-                         const char *tgt_addr, unsigned int tgt_port,
-                         const char *token)
-{
-    for (;;) {
-        HevFshClientPortForward *client;
+        if (!inet_aton (addr, &iaddr))
+            continue;
 
-        client = hev_fsh_client_port_forward_new (srv_addr, srv_port, tgt_addr,
-                                                  tgt_port, token);
-
-        hev_task_system_run ();
-
-        hev_fsh_client_base_destroy ((HevFshClientBase *)client);
-
-        sleep (1);
+        hev_fsh_config_addr_list_add (config, 4, &iaddr, htons (atoi (port)),
+                                      action);
     }
 }
 
-static void
-client_port_listen_run (const char *lis_addr, unsigned int lis_port,
-                        const char *srv_addr, unsigned int srv_port,
-                        const char *token)
+static int
+parse_addr_pair (HevFshConfig *config, const char *str)
 {
-    HevFshClientPortListen *client;
+    char *saveptr;
+    char *v1;
+    char *v2;
+    char *v3;
+    char *v4;
 
-    client = hev_fsh_client_port_listen_new (lis_addr, lis_port, srv_addr,
-                                             srv_port, token);
+    v1 = strtok_r ((char *)str, ":", &saveptr);
+    v2 = strtok_r (NULL, ":", &saveptr);
+    v3 = strtok_r (NULL, ":", &saveptr);
+    v4 = strtok_r (NULL, ":", &saveptr);
 
-    hev_task_system_run ();
+    if (!v1 || !v2 || !v3)
+        return -1;
 
-    hev_fsh_client_base_destroy ((HevFshClientBase *)client);
+    if (v4) {
+        hev_fsh_config_set_local_address (config, v1);
+        hev_fsh_config_set_local_port (config, atoi (v2));
+        hev_fsh_config_set_remote_address (config, v3);
+        hev_fsh_config_set_remote_port (config, atoi (v4));
+    } else {
+        hev_fsh_config_set_local_port (config, atoi (v1));
+        hev_fsh_config_set_remote_address (config, v2);
+        hev_fsh_config_set_remote_port (config, atoi (v3));
+    }
+
+    return 0;
+}
+
+static int
+parse_args (HevFshConfig *config, int argc, char *argv[])
+{
+    int opt;
+    int mode;
+    int s = 0;
+    int f = 0;
+    int p = 0;
+    const char *l = NULL;
+    const char *u = NULL;
+    const char *w = NULL;
+    const char *b = NULL;
+    const char *t1 = NULL;
+    const char *t2 = NULL;
+
+    while ((opt = getopt (argc, argv, "sfpl:u:w:b:")) != -1) {
+        switch (opt) {
+        case 's':
+            s = 1;
+            break;
+        case 'f':
+            f = 1;
+            break;
+        case 'p':
+            p = 1;
+            break;
+        case 'l':
+            l = optarg;
+            break;
+        case 'u':
+            u = optarg;
+            break;
+        case 'w':
+            w = optarg;
+            break;
+        case 'b':
+            b = optarg;
+            break;
+        default:
+            return -1;
+        }
+    }
+
+    if (optind < argc)
+        t1 = argv[optind++];
+    if (optind < argc)
+        t2 = argv[optind++];
+
+    if (s) {
+        const char *sa = t1;
+
+        if (sa) {
+            char *addr;
+            char *port;
+
+            parse_addr (sa, &addr, &port, NULL);
+            hev_fsh_config_set_server_address (config, addr);
+            if (port)
+                hev_fsh_config_set_server_port (config, atoi (port));
+        }
+
+        hev_fsh_config_set_log (config, l);
+        mode = HEV_FSH_CONFIG_MODE_SERVER;
+    } else {
+        char *addr;
+        char *port;
+        char *token;
+        const char *sa;
+        const char *ap = NULL;
+
+        if (!f && p) {
+            ap = t1;
+            sa = t2;
+        } else {
+            sa = t1;
+        }
+
+        if (!sa)
+            return -1;
+
+        parse_addr (sa, &addr, &port, &token);
+        hev_fsh_config_set_server_address (config, addr);
+        if (port)
+            hev_fsh_config_set_server_port (config, atoi (port));
+        hev_fsh_config_set_token (config, token);
+
+        if (f) {
+            if (p) {
+                if (w && b)
+                    return -1;
+
+                if (w) {
+                    hev_fsh_config_addr_list_add (config, 0, NULL, 0, 0);
+                    parse_addr_list (config, w, 1);
+                } else if (b) {
+                    hev_fsh_config_addr_list_add (config, 0, NULL, 0, 1);
+                    parse_addr_list (config, b, 0);
+                } else {
+                    hev_fsh_config_addr_list_add (config, 0, NULL, 0, 1);
+                }
+                mode = HEV_FSH_CONFIG_MODE_FORWARDER_PORT;
+            } else {
+                hev_fsh_config_set_user (config, u);
+                mode = HEV_FSH_CONFIG_MODE_FORWARDER_TERM;
+            }
+        } else {
+            if (!token)
+                return -1;
+
+            if (p) {
+                if (0 > parse_addr_pair (config, ap))
+                    return -1;
+                mode = HEV_FSH_CONFIG_MODE_CONNECTOR_PORT;
+            } else {
+                mode = HEV_FSH_CONFIG_MODE_CONNECTOR_TERM;
+            }
+        }
+    }
+
+    hev_fsh_config_set_mode (config, mode);
+
+    return 0;
+}
+
+static int
+setup_log (int mode, const char *log)
+{
+    int fd;
+
+    if (HEV_FSH_CONFIG_MODE_SERVER != mode || !log)
+        return 0;
+
+    /* redirect log */
+    fd = open (log, O_CREAT | O_APPEND | O_WRONLY, 0644);
+    if (fd == -1) {
+        fprintf (stderr, "Open log file %s failed!\n", log);
+        return -1;
+    }
+
+    close (1);
+    close (2);
+    dup2 (fd, 1);
+    dup2 (fd, 2);
+
+    return 0;
 }
 
 int
 main (int argc, char *argv[])
 {
-    int opt;
-    const char *lis_addr = "0.0.0.0";
-    const char *srv_addr = NULL;
-    const char *loc_addr = "127.0.0.1";
-    unsigned int srv_port = 6339;
-    unsigned int loc_port = 0;
-    const char *cval = NULL;
-    const char *log = NULL;
-    const char *user = NULL;
-    const char *token = NULL;
+    HevFshConfig *config = NULL;
+    int mode;
+    const char *log;
 
-    while ((opt = getopt (argc, argv, "a:p:s:l:u:c:t:o:x:")) != -1) {
-        switch (opt) {
-        case 'a':
-            lis_addr = optarg;
-            break;
-        case 's':
-            srv_addr = optarg;
-            break;
-        case 'p':
-            srv_port = atoi (optarg);
-            break;
-        case 'l':
-            log = optarg;
-            break;
-        case 'u':
-            user = optarg;
-            break;
-        case 't':
-            token = optarg;
-            break;
-        case 'c':
-            cval = optarg;
-            break;
-        case 'o':
-            loc_addr = optarg;
-            break;
-        case 'x':
-            loc_port = atoi (optarg);
-            break;
-        default: /* '?' */
-            show_help ();
-            return -1;
-        }
+    config = hev_fsh_config_new ();
+    if (!config)
+        return -1;
+
+    if (0 > parse_args (config, argc, argv)) {
+        show_help ();
+        return -1;
     }
 
-    /* redirect log for server */
-    if (log && !srv_addr) {
-        int fd;
+    mode = hev_fsh_config_get_mode (config);
+    log = hev_fsh_config_get_log (config);
 
-        fd = open (log, O_CREAT | O_APPEND | O_WRONLY, 0644);
-        if (fd == -1) {
-            fprintf (stderr, "Open log file %s failed!\n", log);
-            return -1;
-        }
+    if (0 > setup_log (mode, log))
+        return -1;
 
-        close (1);
-        close (2);
-        dup2 (fd, 1);
-        dup2 (fd, 2);
-    }
-
-    if (signal (SIGPIPE, SIG_IGN) == SIG_ERR) {
+    if (SIG_ERR == signal (SIGPIPE, SIG_IGN)) {
         fprintf (stderr, "Set signal pipe's handler failed!\n");
         return -1;
     }
 
-    if (hev_task_system_init () < 0) {
+    if (0 > hev_task_system_init ()) {
         fprintf (stderr, "Init task system failed!\n");
         return -1;
     }
 
-    if (srv_addr) {
-        if (loc_port) {
-            if (cval) {
-                client_port_listen_run (loc_addr, loc_port, srv_addr, srv_port,
-                                        cval);
-            } else {
-                client_port_forward_run (srv_addr, srv_port, loc_addr, loc_port,
-                                         token);
-            }
-        } else {
-            if (cval) {
-                client_term_connect_run (srv_addr, srv_port, cval);
-            } else {
-                client_term_forward_run (srv_addr, srv_port, user, token);
-            }
+    if (HEV_FSH_CONFIG_MODE_SERVER == mode) {
+        HevFshServer *server;
+
+        server = hev_fsh_server_new (config);
+        if (!server) {
+            fprintf (stderr, "Create fsh server failed!\n");
+            return -1;
         }
+
+        hev_fsh_server_start (server);
+
+        hev_task_system_run ();
+
+        hev_fsh_server_destroy (server);
     } else {
-        server_run (lis_addr, srv_port);
+        HevFshClientBase *client;
+
+        if (HEV_FSH_CONFIG_MODE_FORWARDER & mode) {
+            for (;;) {
+                if (HEV_FSH_CONFIG_MODE_FORWARDER_PORT == mode)
+                    client = hev_fsh_client_port_forward_new (config);
+                else
+                    client = hev_fsh_client_term_forward_new (config);
+
+                hev_task_system_run ();
+
+                hev_fsh_client_base_destroy (client);
+
+                sleep (1);
+            }
+        } else if (HEV_FSH_CONFIG_MODE_CONNECTOR & mode) {
+            if (HEV_FSH_CONFIG_MODE_CONNECTOR_PORT == mode)
+                client = hev_fsh_client_port_listen_new (config);
+            else
+                client = hev_fsh_client_term_connect_new (config);
+
+            hev_task_system_run ();
+
+            hev_fsh_client_base_destroy (client);
+        }
     }
 
     hev_task_system_fini ();
+    hev_fsh_config_destroy (config);
 
     return 0;
 }
