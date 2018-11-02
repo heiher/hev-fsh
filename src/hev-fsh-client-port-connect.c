@@ -37,7 +37,7 @@ struct _HevFshClientPortConnect
 static void hev_fsh_client_port_connect_task_entry (void *data);
 static void hev_fsh_client_port_connect_destroy (HevFshClientBase *base);
 
-HevFshClientPortConnect *
+HevFshClientBase *
 hev_fsh_client_port_connect_new (HevFshConfig *config, int local_fd)
 {
     HevFshClientPortConnect *self;
@@ -72,7 +72,7 @@ hev_fsh_client_port_connect_new (HevFshConfig *config, int local_fd)
 
     hev_task_run (self->task, hev_fsh_client_port_connect_task_entry, self);
 
-    return self;
+    return &self->base;
 }
 
 static void

@@ -15,7 +15,7 @@
 
 typedef struct _HevFshClientPortConnect HevFshClientPortConnect;
 
-HevFshClientPortConnect *hev_fsh_client_port_connect_new (HevFshConfig *config,
-                                                          int local_fd);
+HevFshClientBase *hev_fsh_client_port_connect_new (HevFshConfig *config,
+                                                   int local_fd);
 
 #endif /* __HEV_FSH_CLIENT_PORT_CONNECT_H__ */
