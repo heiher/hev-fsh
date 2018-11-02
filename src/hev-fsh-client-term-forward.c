@@ -28,26 +28,30 @@ struct _HevFshClientTermForward
 {
     HevFshClientBase base;
 
-    const char *user;
-    const char *token;
+    HevFshToken token;
 
     HevTask *task;
+    HevFshConfig *config;
 };
 
 static void hev_fsh_client_term_forward_task_entry (void *data);
 static void hev_fsh_client_term_forward_destroy (HevFshClientBase *self);
 
 HevFshClientTermForward *
-hev_fsh_client_term_forward_new (const char *address, unsigned int port,
-                                 const char *user, const char *token)
+hev_fsh_client_term_forward_new (HevFshConfig *config)
 {
     HevFshClientTermForward *self;
+    const char *address;
+    unsigned int port;
 
     self = hev_malloc0 (sizeof (HevFshClientTermForward));
     if (!self) {
         fprintf (stderr, "Allocate client term forward failed!\n");
         return NULL;
     }
+
+    address = hev_fsh_config_get_server_address (config);
+    port = hev_fsh_config_get_server_port (config);
 
     if (0 > hev_fsh_client_base_construct (&self->base, address, port)) {
         fprintf (stderr, "Construct client base failed!\n");
@@ -62,8 +66,7 @@ hev_fsh_client_term_forward_new (const char *address, unsigned int port,
         return NULL;
     }
 
-    self->user = user;
-    self->token = token;
+    self->config = config;
     self->base._destroy = hev_fsh_client_term_forward_destroy;
 
     hev_task_run (self->task, hev_fsh_client_term_forward_task_entry, self);
@@ -83,14 +86,12 @@ hev_fsh_client_term_forward_task_entry (void *data)
     HevTask *task = hev_task_self ();
     HevFshClientTermForward *self = data;
     HevFshMessage message;
-    HevFshMessageToken send_token;
-    HevFshMessageToken recv_token;
-    HevFshToken token;
+    HevFshMessageToken msg_token;
     int sock_fd, wait_keep_alive = 0;
     unsigned int sleep_ms = KEEP_ALIVE_INTERVAL;
+    const char *token, *token_src;
+    char token_buf[40];
     ssize_t len;
-    char token_str[40];
-    char *token_src;
 
     sock_fd = self->base.fd;
     hev_task_add_fd (task, sock_fd, EPOLLIN | EPOLLOUT);
@@ -102,23 +103,24 @@ hev_fsh_client_term_forward_task_entry (void *data)
         return;
     }
 
-    message.ver = self->token ? 2 : 1;
-    message.cmd = HEV_FSH_CMD_LOGIN;
+    token = hev_fsh_config_get_token (self->config);
 
+    message.ver = token ? 2 : 1;
+    message.cmd = HEV_FSH_CMD_LOGIN;
     len = hev_task_io_socket_send (sock_fd, &message, sizeof (message),
                                    MSG_WAITALL, NULL, NULL);
     if (len <= 0)
         return;
 
-    if (self->token) {
-        if (hev_fsh_protocol_token_from_string (send_token.token,
-                                                self->token) == -1) {
+    if (token) {
+        if (0 > hev_fsh_protocol_token_from_string (self->token, token)) {
             fprintf (stderr, "Can't parse token!\n");
             return;
         }
 
-        len = hev_task_io_socket_send (
-            sock_fd, &send_token, sizeof (send_token), MSG_WAITALL, NULL, NULL);
+        memcpy (msg_token.token, self->token, sizeof (HevFshToken));
+        len = hev_task_io_socket_send (sock_fd, &msg_token, sizeof (msg_token),
+                                       MSG_WAITALL, NULL, NULL);
         if (len <= 0)
             return;
     }
@@ -134,19 +136,19 @@ hev_fsh_client_term_forward_task_entry (void *data)
         return;
     }
 
-    len = hev_task_io_socket_recv (sock_fd, &recv_token, sizeof (recv_token),
+    len = hev_task_io_socket_recv (sock_fd, &msg_token, sizeof (msg_token),
                                    MSG_WAITALL, NULL, NULL);
     if (len <= 0)
         return;
 
-    memcpy (token, recv_token.token, sizeof (HevFshToken));
-    hev_fsh_protocol_token_to_string (token, token_str);
-    if (0 == memcmp (&send_token, &recv_token, sizeof (HevFshMessageToken))) {
+    hev_fsh_protocol_token_to_string (msg_token.token, token_buf);
+    if (0 == memcmp (msg_token.token, self->token, sizeof (HevFshToken))) {
         token_src = "client";
     } else {
         token_src = "server";
+        memcpy (self->token, msg_token.token, sizeof (HevFshToken));
     }
-    printf ("Token: %s (from %s)\n", token_str, token_src);
+    printf ("Token: %s (from %s)\n", token_buf, token_src);
 
     for (;;) {
         sleep_ms = hev_task_sleep (sleep_ms);
@@ -187,17 +189,15 @@ hev_fsh_client_term_forward_task_entry (void *data)
             return;
         }
 
-        len = hev_task_io_socket_recv (
-            sock_fd, &recv_token, sizeof (recv_token), MSG_WAITALL, NULL, NULL);
+        len = hev_task_io_socket_recv (sock_fd, &msg_token, sizeof (msg_token),
+                                       MSG_WAITALL, NULL, NULL);
         if (len <= 0)
             return;
 
-        if (memcmp (recv_token.token, token, sizeof (HevFshToken)) != 0)
+        if (0 != memcmp (msg_token.token, self->token, sizeof (HevFshToken)))
             return;
 
-        hev_fsh_client_term_accept_new (&self->base.address,
-                                        sizeof (struct sockaddr_in), self->user,
-                                        &recv_token.token);
+        hev_fsh_client_term_accept_new (self->config, self->token);
         sleep_ms = KEEP_ALIVE_INTERVAL;
     }
 }

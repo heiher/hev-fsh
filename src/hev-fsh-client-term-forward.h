@@ -10,13 +10,11 @@
 #ifndef __HEV_FSH_CLIENT_TERM_FORWARD_H__
 #define __HEV_FSH_CLIENT_TERM_FORWARD_H__
 
+#include "hev-fsh-config.h"
 #include "hev-fsh-client-base.h"
 
 typedef struct _HevFshClientTermForward HevFshClientTermForward;
 
-HevFshClientTermForward *hev_fsh_client_term_forward_new (const char *address,
-                                                          unsigned int port,
-                                                          const char *user,
-                                                          const char *token);
+HevFshClientTermForward *hev_fsh_client_term_forward_new (HevFshConfig *config);
 
 #endif /* __HEV_FSH_CLIENT_TERM_FORWARD_H__ */
