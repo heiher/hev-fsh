@@ -48,10 +48,12 @@ static void session_manager_remove_session (HevFshServer *self,
 static void session_close_handler (HevFshServerSession *session, void *data);
 
 HevFshServer *
-hev_fsh_server_new (const char *address, unsigned int port)
+hev_fsh_server_new (HevFshConfig *config)
 {
     HevFshServer *self;
     int fd, ret, reuseaddr = 1;
+    const char *address;
+    unsigned int port;
     struct sockaddr_in addr;
 
     fd = socket (AF_INET, SOCK_STREAM, 0);
@@ -73,6 +75,9 @@ hev_fsh_server_new (const char *address, unsigned int port)
         close (fd);
         return NULL;
     }
+
+    address = hev_fsh_config_get_server_address (config);
+    port = hev_fsh_config_get_server_port (config);
 
     memset (&addr, 0, sizeof (addr));
     addr.sin_family = AF_INET;
