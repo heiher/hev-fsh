@@ -10,14 +10,11 @@
 #ifndef __HEV_FSH_CLIENT_PORT_FORWARD_H__
 #define __HEV_FSH_CLIENT_PORT_FORWARD_H__
 
+#include "hev-fsh-config.h"
 #include "hev-fsh-client-base.h"
 
 typedef struct _HevFshClientPortForward HevFshClientPortForward;
 
-HevFshClientPortForward *hev_fsh_client_port_forward_new (const char *address,
-                                                          unsigned int port,
-                                                          const char *srv_addr,
-                                                          unsigned int srv_port,
-                                                          const char *token);
+HevFshClientPortForward *hev_fsh_client_port_forward_new (HevFshConfig *config);
 
 #endif /* __HEV_FSH_CLIENT_PORT_FORWARD_H__ */
