@@ -13,6 +13,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <sys/types.h>
+#include <arpa/inet.h>
 #include <netinet/in.h>
 
 #include "hev-fsh-client-port-connect.h"
@@ -28,25 +29,29 @@ struct _HevFshClientPortConnect
     HevFshClientBase base;
 
     int local_fd;
-    const char *token;
 
     HevTask *task;
+    HevFshConfig *config;
 };
 
 static void hev_fsh_client_port_connect_task_entry (void *data);
 static void hev_fsh_client_port_connect_destroy (HevFshClientBase *base);
 
 HevFshClientPortConnect *
-hev_fsh_client_port_connect_new (const char *address, unsigned int port,
-                                 const char *token, int local_fd)
+hev_fsh_client_port_connect_new (HevFshConfig *config, int local_fd)
 {
     HevFshClientPortConnect *self;
+    const char *address;
+    unsigned int port;
 
     self = hev_malloc0 (sizeof (HevFshClientPortConnect));
     if (!self) {
         fprintf (stderr, "Allocate client port connect failed!\n");
         return NULL;
     }
+
+    address = hev_fsh_config_get_server_address (config);
+    port = hev_fsh_config_get_server_port (config);
 
     if (0 > hev_fsh_client_base_construct (&self->base, address, port)) {
         fprintf (stderr, "Construct client base failed!\n");
@@ -61,7 +66,7 @@ hev_fsh_client_port_connect_new (const char *address, unsigned int port,
         return NULL;
     }
 
-    self->token = token;
+    self->config = config;
     self->local_fd = local_fd;
     self->base._destroy = hev_fsh_client_port_connect_destroy;
 
@@ -86,6 +91,10 @@ hev_fsh_client_port_connect_task_entry (void *data)
     HevFshClientPortConnect *self = data;
     HevFshMessage message;
     HevFshMessageToken message_token;
+    HevFshMessagePortInfo message_port_info;
+    const char *token;
+    const char *address;
+    unsigned int port;
     ssize_t len;
 
     hev_task_add_fd (task, self->base.fd, EPOLLIN | EPOLLOUT);
@@ -105,8 +114,8 @@ hev_fsh_client_port_connect_task_entry (void *data)
     if (len <= 0)
         goto quit;
 
-    if (hev_fsh_protocol_token_from_string (message_token.token, self->token) ==
-        -1) {
+    token = hev_fsh_config_get_token (self->config);
+    if (hev_fsh_protocol_token_from_string (message_token.token, token) == -1) {
         fprintf (stderr, "Can't parse token!\n");
         goto quit;
     }
@@ -115,6 +124,19 @@ hev_fsh_client_port_connect_task_entry (void *data)
     len = hev_task_io_socket_send (self->base.fd, &message_token,
                                    sizeof (message_token), MSG_WAITALL, NULL,
                                    NULL);
+    if (len <= 0)
+        goto quit;
+
+    address = hev_fsh_config_get_remote_address (self->config);
+    port = hev_fsh_config_get_remote_port (self->config);
+    message_port_info.type = 4;
+    message_port_info.port = htons (port);
+    inet_aton (address, (struct in_addr *)&message_port_info.addr);
+
+    /* send message port info */
+    len = hev_task_io_socket_send (self->base.fd, &message_port_info,
+                                   sizeof (message_port_info), MSG_WAITALL,
+                                   NULL, NULL);
     if (len <= 0)
         goto quit;
 
