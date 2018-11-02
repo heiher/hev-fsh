@@ -15,6 +15,6 @@
 
 typedef struct _HevFshClientPortForward HevFshClientPortForward;
 
-HevFshClientPortForward *hev_fsh_client_port_forward_new (HevFshConfig *config);
+HevFshClientBase *hev_fsh_client_port_forward_new (HevFshConfig *config);
 
 #endif /* __HEV_FSH_CLIENT_PORT_FORWARD_H__ */
