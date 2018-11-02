@@ -26,28 +26,28 @@ struct _HevFshClientPortListen
 {
     HevFshClientBase base;
 
-    const char *token;
-    const char *srv_addr;
-    unsigned int srv_port;
-
     HevTask *task;
+    HevFshConfig *config;
 };
 
 static void hev_fsh_client_port_listen_task_entry (void *data);
 static void hev_fsh_client_port_listen_destroy (HevFshClientBase *self);
 
 HevFshClientPortListen *
-hev_fsh_client_port_listen_new (const char *address, unsigned int port,
-                                const char *srv_addr, unsigned int srv_port,
-                                const char *token)
+hev_fsh_client_port_listen_new (HevFshConfig *config)
 {
     HevFshClientPortListen *self;
+    const char *address;
+    unsigned int port;
 
     self = hev_malloc0 (sizeof (HevFshClientPortListen));
     if (!self) {
         fprintf (stderr, "Allocate client port connect failed!\n");
         return NULL;
     }
+
+    address = hev_fsh_config_get_local_address (config);
+    port = hev_fsh_config_get_local_port (config);
 
     if (0 > hev_fsh_client_base_construct (&self->base, address, port)) {
         fprintf (stderr, "Construct client base failed!\n");
@@ -75,9 +75,7 @@ hev_fsh_client_port_listen_new (const char *address, unsigned int port,
         return NULL;
     }
 
-    self->token = token;
-    self->srv_addr = srv_addr;
-    self->srv_port = srv_port;
+    self->config = config;
     self->base._destroy = hev_fsh_client_port_listen_destroy;
 
     hev_task_run (self->task, hev_fsh_client_port_listen_task_entry, self);
@@ -107,8 +105,7 @@ hev_fsh_client_port_listen_task_entry (void *data)
         if (0 > fd)
             continue;
 
-        client = hev_fsh_client_port_connect_new (
-            self->srv_addr, self->srv_port, self->token, fd);
+        client = hev_fsh_client_port_connect_new (self->config, fd);
         if (!client)
             close (fd);
     }
