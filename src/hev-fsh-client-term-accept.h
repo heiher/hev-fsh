@@ -16,7 +16,7 @@
 
 typedef struct _HevFshClientTermAccept HevFshClientTermAccept;
 
-HevFshClientTermAccept *hev_fsh_client_term_accept_new (HevFshConfig *config,
-                                                        HevFshToken token);
+HevFshClientBase *hev_fsh_client_term_accept_new (HevFshConfig *config,
+                                                  HevFshToken token);
 
 #endif /* __HEV_FSH_CLIENT_TERM_ACCEPT_H__ */

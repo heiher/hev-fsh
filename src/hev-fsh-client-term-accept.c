@@ -38,7 +38,7 @@ struct _HevFshClientTermAccept
 static void hev_fsh_client_term_accept_task_entry (void *data);
 static void hev_fsh_client_term_accept_destroy (HevFshClientBase *self);
 
-HevFshClientTermAccept *
+HevFshClientBase *
 hev_fsh_client_term_accept_new (HevFshConfig *config, HevFshToken token)
 {
     HevFshClientTermAccept *self;
@@ -73,7 +73,7 @@ hev_fsh_client_term_accept_new (HevFshConfig *config, HevFshToken token)
 
     hev_task_run (self->task, hev_fsh_client_term_accept_task_entry, self);
 
-    return self;
+    return &self->base;
 }
 
 static void
