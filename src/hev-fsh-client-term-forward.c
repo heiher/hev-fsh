@@ -37,7 +37,7 @@ struct _HevFshClientTermForward
 static void hev_fsh_client_term_forward_task_entry (void *data);
 static void hev_fsh_client_term_forward_destroy (HevFshClientBase *self);
 
-HevFshClientTermForward *
+HevFshClientBase *
 hev_fsh_client_term_forward_new (HevFshConfig *config)
 {
     HevFshClientTermForward *self;
@@ -71,7 +71,7 @@ hev_fsh_client_term_forward_new (HevFshConfig *config)
 
     hev_task_run (self->task, hev_fsh_client_term_forward_task_entry, self);
 
-    return self;
+    return &self->base;
 }
 
 static void
