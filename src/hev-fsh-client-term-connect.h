@@ -15,6 +15,6 @@
 
 typedef struct _HevFshClientTermConnect HevFshClientTermConnect;
 
-HevFshClientTermConnect *hev_fsh_client_term_connect_new (HevFshConfig *config);
+HevFshClientBase *hev_fsh_client_term_connect_new (HevFshConfig *config);
 
 #endif /* __HEV_FSH_CLIENT_TERM_CONNECT_H__ */
