@@ -29,20 +29,21 @@ struct _HevFshClientTermAccept
 {
     HevFshClientBase base;
 
-    const char *user;
     HevFshToken token;
 
     HevTask *task;
+    HevFshConfig *config;
 };
 
 static void hev_fsh_client_term_accept_task_entry (void *data);
 static void hev_fsh_client_term_accept_destroy (HevFshClientBase *self);
 
 HevFshClientTermAccept *
-hev_fsh_client_term_accept_new (struct sockaddr *addr, socklen_t addrlen,
-                                const char *user, HevFshToken *token)
+hev_fsh_client_term_accept_new (HevFshConfig *config, HevFshToken token)
 {
     HevFshClientTermAccept *self;
+    const char *address;
+    unsigned int port;
 
     self = hev_malloc0 (sizeof (HevFshClientTermAccept));
     if (!self) {
@@ -50,8 +51,10 @@ hev_fsh_client_term_accept_new (struct sockaddr *addr, socklen_t addrlen,
         return NULL;
     }
 
-    if (0 > hev_fsh_client_base_construct_with_sockaddr (&self->base, addr,
-                                                         addrlen)) {
+    address = hev_fsh_config_get_server_address (config);
+    port = hev_fsh_config_get_server_port (config);
+
+    if (0 > hev_fsh_client_base_construct (&self->base, address, port)) {
         fprintf (stderr, "Construct client base failed!\n");
         hev_free (self);
         return NULL;
@@ -64,8 +67,8 @@ hev_fsh_client_term_accept_new (struct sockaddr *addr, socklen_t addrlen,
         return NULL;
     }
 
-    self->user = user;
-    memcpy (&self->token, token, sizeof (HevFshToken));
+    self->config = config;
+    memcpy (self->token, token, sizeof (HevFshToken));
     self->base._destroy = hev_fsh_client_term_accept_destroy;
 
     hev_task_run (self->task, hev_fsh_client_term_accept_task_entry, self);
@@ -123,7 +126,7 @@ hev_fsh_client_term_accept_task_entry (void *data)
                                    sizeof (message_term_info), MSG_WAITALL,
                                    NULL, NULL);
     if (len <= 0)
-        return;
+        goto quit;
 
     pid = forkpty (&ptm_fd, NULL, NULL, NULL);
     if (pid == -1) {
@@ -137,10 +140,13 @@ hev_fsh_client_term_accept_task_entry (void *data)
             cmd = sh;
 
         if (getuid () == 0) {
-            if (self->user) {
+            const char *user;
+
+            user = hev_fsh_config_get_user (self->config);
+            if (user) {
                 struct passwd *pwd;
 
-                pwd = getpwnam (self->user);
+                pwd = getpwnam (user);
                 if (pwd) {
                     setgid (pwd->pw_gid);
                     setuid (pwd->pw_uid);
