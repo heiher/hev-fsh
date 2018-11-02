@@ -29,26 +29,28 @@ struct _HevFshClientTermConnect
 {
     HevFshClientBase base;
 
-    const char *user;
-    const char *token;
-
     HevTask *task;
+    HevFshConfig *config;
 };
 
 static void hev_fsh_client_term_connect_task_entry (void *data);
 static void hev_fsh_client_term_connect_destroy (HevFshClientBase *self);
 
 HevFshClientTermConnect *
-hev_fsh_client_term_connect_new (const char *address, unsigned int port,
-                                 const char *token)
+hev_fsh_client_term_connect_new (HevFshConfig *config)
 {
     HevFshClientTermConnect *self;
+    const char *address;
+    unsigned int port;
 
     self = hev_malloc0 (sizeof (HevFshClientTermConnect));
     if (!self) {
         fprintf (stderr, "Allocate client term connect failed!\n");
         return NULL;
     }
+
+    address = hev_fsh_config_get_server_address (config);
+    port = hev_fsh_config_get_server_port (config);
 
     if (0 > hev_fsh_client_base_construct (&self->base, address, port)) {
         fprintf (stderr, "Construct client base failed!\n");
@@ -63,7 +65,7 @@ hev_fsh_client_term_connect_new (const char *address, unsigned int port,
         return NULL;
     }
 
-    self->token = token;
+    self->config = config;
     self->base._destroy = hev_fsh_client_term_connect_destroy;
 
     hev_task_run (self->task, hev_fsh_client_term_connect_task_entry, self);
@@ -87,6 +89,7 @@ hev_fsh_client_term_connect_task_entry (void *data)
     HevFshMessageTermInfo message_term_info;
     struct termios term, term_rsh;
     struct winsize win_size;
+    const char *token;
     ssize_t len;
 
     hev_task_add_fd (task, self->base.fd, EPOLLIN | EPOLLOUT);
@@ -106,8 +109,8 @@ hev_fsh_client_term_connect_task_entry (void *data)
     if (len <= 0)
         return;
 
-    if (hev_fsh_protocol_token_from_string (message_token.token, self->token) ==
-        -1) {
+    token = hev_fsh_config_get_token (self->config);
+    if (hev_fsh_protocol_token_from_string (message_token.token, token) == -1) {
         fprintf (stderr, "Can't parse token!\n");
         return;
     }
@@ -125,7 +128,7 @@ hev_fsh_client_term_connect_task_entry (void *data)
     message_term_info.rows = win_size.ws_row;
     message_term_info.columns = win_size.ws_col;
 
-    /* send message token */
+    /* send message term info */
     len = hev_task_io_socket_send (self->base.fd, &message_term_info,
                                    sizeof (message_term_info), MSG_WAITALL,
                                    NULL, NULL);
