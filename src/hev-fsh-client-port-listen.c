@@ -39,6 +39,7 @@ hev_fsh_client_port_listen_new (HevFshConfig *config)
     HevFshClientPortListen *self;
     const char *address;
     unsigned int port;
+    int reuseaddr = 1;
 
     self = hev_malloc0 (sizeof (HevFshClientPortListen));
     if (!self) {
@@ -51,6 +52,13 @@ hev_fsh_client_port_listen_new (HevFshConfig *config)
 
     if (0 > hev_fsh_client_base_construct (&self->base, address, port)) {
         fprintf (stderr, "Construct client base failed!\n");
+        hev_free (self);
+        return NULL;
+    }
+
+    if (0 > setsockopt (self->base.fd, SOL_SOCKET, SO_REUSEADDR, &reuseaddr,
+                        sizeof (reuseaddr))) {
+        fprintf (stderr, "Set reuse address failed!\n");
         hev_free (self);
         return NULL;
     }
