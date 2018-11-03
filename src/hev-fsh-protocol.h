@@ -14,6 +14,7 @@ typedef enum _HevFshCommand HevFshCommand;
 typedef struct _HevFshMessage HevFshMessage;
 typedef struct _HevFshMessageToken HevFshMessageToken;
 typedef struct _HevFshMessageTermInfo HevFshMessageTermInfo;
+typedef struct _HevFshMessagePortInfo HevFshMessagePortInfo;
 typedef unsigned char HevFshToken[16];
 
 enum _HevFshCommand
@@ -40,6 +41,13 @@ struct _HevFshMessageTermInfo
 {
     unsigned short rows;
     unsigned short columns;
+} __attribute__ ((packed));
+
+struct _HevFshMessagePortInfo
+{
+    unsigned char type;
+    unsigned short port;
+    unsigned char addr[16];
 } __attribute__ ((packed));
 
 void hev_fsh_protocol_token_generate (HevFshToken token);
