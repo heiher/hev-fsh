@@ -1,9 +1,9 @@
 /*
  ============================================================================
- Name        : hev-fsh-client-port-forward.c
+ Name        : hev-fsh-client-forward.c
  Author      : Heiher <r@hev.cc>
  Copyright   : Copyright (c) 2018 everyone.
- Description : Fsh client port forward
+ Description : Fsh client forward
  ============================================================================
  */
 
@@ -14,7 +14,8 @@
 #include <sys/types.h>
 #include <netinet/in.h>
 
-#include "hev-fsh-client-port-forward.h"
+#include "hev-fsh-client-forward.h"
+#include "hev-fsh-client-term-accept.h"
 #include "hev-fsh-client-port-accept.h"
 #include "hev-fsh-protocol.h"
 #include "hev-memory-allocator.h"
@@ -24,7 +25,7 @@
 #define TASK_STACK_SIZE (64 * 4096)
 #define KEEP_ALIVE_INTERVAL (30 * 1000)
 
-struct _HevFshClientPortForward
+struct _HevFshClientForward
 {
     HevFshClientBase base;
 
@@ -34,19 +35,19 @@ struct _HevFshClientPortForward
     HevFshConfig *config;
 };
 
-static void hev_fsh_client_port_forward_task_entry (void *data);
-static void hev_fsh_client_port_forward_destroy (HevFshClientBase *self);
+static void hev_fsh_client_forward_task_entry (void *data);
+static void hev_fsh_client_forward_destroy (HevFshClientBase *self);
 
 HevFshClientBase *
-hev_fsh_client_port_forward_new (HevFshConfig *config)
+hev_fsh_client_forward_new (HevFshConfig *config)
 {
-    HevFshClientPortForward *self;
+    HevFshClientForward *self;
     const char *address;
     unsigned int port;
 
-    self = hev_malloc0 (sizeof (HevFshClientPortForward));
+    self = hev_malloc0 (sizeof (HevFshClientForward));
     if (!self) {
-        fprintf (stderr, "Allocate client port forward failed!\n");
+        fprintf (stderr, "Allocate client forward failed!\n");
         return NULL;
     }
 
@@ -61,33 +62,33 @@ hev_fsh_client_port_forward_new (HevFshConfig *config)
 
     self->task = hev_task_new (TASK_STACK_SIZE);
     if (!self->task) {
-        fprintf (stderr, "Create client port's task failed!\n");
+        fprintf (stderr, "Create client forward's task failed!\n");
         hev_free (self);
         return NULL;
     }
 
     self->config = config;
-    self->base._destroy = hev_fsh_client_port_forward_destroy;
+    self->base._destroy = hev_fsh_client_forward_destroy;
 
-    hev_task_run (self->task, hev_fsh_client_port_forward_task_entry, self);
+    hev_task_run (self->task, hev_fsh_client_forward_task_entry, self);
 
     return &self->base;
 }
 
 static void
-hev_fsh_client_port_forward_destroy (HevFshClientBase *self)
+hev_fsh_client_forward_destroy (HevFshClientBase *self)
 {
     hev_free (self);
 }
 
 static void
-hev_fsh_client_port_forward_task_entry (void *data)
+hev_fsh_client_forward_task_entry (void *data)
 {
     HevTask *task = hev_task_self ();
-    HevFshClientPortForward *self = data;
+    HevFshClientForward *self = data;
     HevFshMessage message;
     HevFshMessageToken msg_token;
-    int sock_fd, wait_keep_alive = 0;
+    int mode, sock_fd, wait_keep_alive = 0;
     unsigned int sleep_ms = KEEP_ALIVE_INTERVAL;
     const char *token, *token_src;
     char token_buf[40];
@@ -151,6 +152,8 @@ hev_fsh_client_port_forward_task_entry (void *data)
     }
     printf ("Token: %s (from %s)\n", token_buf, token_src);
 
+    mode = hev_fsh_config_get_mode (self->config);
+
     for (;;) {
         sleep_ms = hev_task_sleep (sleep_ms);
 
@@ -198,7 +201,10 @@ hev_fsh_client_port_forward_task_entry (void *data)
         if (0 != memcmp (msg_token.token, self->token, sizeof (HevFshToken)))
             return;
 
-        hev_fsh_client_port_accept_new (self->config, self->token);
+        if (HEV_FSH_CONFIG_MODE_FORWARDER_PORT == mode)
+            hev_fsh_client_port_accept_new (self->config, self->token);
+        else
+            hev_fsh_client_term_accept_new (self->config, self->token);
         sleep_ms = KEEP_ALIVE_INTERVAL;
     }
 }
