@@ -29,7 +29,7 @@
 #include "hev-fsh-client-port-listen.h"
 
 #define MAJOR_VERSION (3)
-#define MINOR_VERSION (0)
+#define MINOR_VERSION (1)
 #define MICRO_VERSION (0)
 
 static void
