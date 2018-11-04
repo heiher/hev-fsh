@@ -72,6 +72,9 @@ fsh -s -l /var/log/fsh.log
     # Map the TCP port to forwarder's network service
     fsh -p 2200:192.168.0.1:22 10.0.0.1/8b9bf4e7-b2b2-4115-ac97-0c7f69433bc4
     fsh -p 0.0.0.0:2200:192.168.0.1:22 10.0.0.1/8b9bf4e7-b2b2-4115-ac97-0c7f69433bc4
+
+    # Splice to stdin/stdout (Support SSH ProxyCommand)
+    fsh -p 192.168.0.1:22 10.0.0.1/8b9bf4e7-b2b2-4115-ac97-0c7f69433bc4
     ```
 
 ## Authors
