@@ -23,9 +23,8 @@
 #include "hev-task-system.h"
 #include "hev-fsh-config.h"
 #include "hev-fsh-server.h"
-#include "hev-fsh-client-term-forward.h"
+#include "hev-fsh-client-forward.h"
 #include "hev-fsh-client-term-connect.h"
-#include "hev-fsh-client-port-forward.h"
 #include "hev-fsh-client-port-listen.h"
 
 #define MAJOR_VERSION (2)
@@ -321,10 +320,7 @@ main (int argc, char *argv[])
 
         if (HEV_FSH_CONFIG_MODE_FORWARDER & mode) {
             for (;;) {
-                if (HEV_FSH_CONFIG_MODE_FORWARDER_PORT == mode)
-                    client = hev_fsh_client_port_forward_new (config);
-                else
-                    client = hev_fsh_client_term_forward_new (config);
+                client = hev_fsh_client_forward_new (config);
 
                 hev_task_system_run ();
 
