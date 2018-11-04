@@ -25,6 +25,7 @@
 #include "hev-fsh-server.h"
 #include "hev-fsh-client-forward.h"
 #include "hev-fsh-client-term-connect.h"
+#include "hev-fsh-client-port-connect.h"
 #include "hev-fsh-client-port-listen.h"
 
 #define MAJOR_VERSION (3)
@@ -43,6 +44,8 @@ show_help (void)
              "  Forwarder: -f -p [-w ADDR:PORT,... | -b ADDR:PORT,...] "
              "SERVER_ADDR[:SERVER_PORT/TOKEN\n"
              "  Connector: -p [LOCAL_ADDR:]LOCAL_PORT:REMOTE_ADD:REMOTE_PORT "
+             "SERVER_ADDR[:SERVER_PORT]/TOKEN\n"
+             "             -p REMOTE_ADD:REMOTE_PORT "
              "SERVER_ADDR[:SERVER_PORT]/TOKEN\n");
     fprintf (stderr, "Version: %d.%d.%d\n", MAJOR_VERSION, MINOR_VERSION,
              MICRO_VERSION);
@@ -105,18 +108,21 @@ parse_addr_pair (HevFshConfig *config, const char *str)
     v3 = strtok_r (NULL, ":", &saveptr);
     v4 = strtok_r (NULL, ":", &saveptr);
 
-    if (!v1 || !v2 || !v3)
+    if (!v1 || !v2)
         return -1;
 
-    if (v4) {
+    if (v3 && v4) {
         hev_fsh_config_set_local_address (config, v1);
         hev_fsh_config_set_local_port (config, atoi (v2));
         hev_fsh_config_set_remote_address (config, v3);
         hev_fsh_config_set_remote_port (config, atoi (v4));
-    } else {
+    } else if (v3) {
         hev_fsh_config_set_local_port (config, atoi (v1));
         hev_fsh_config_set_remote_address (config, v2);
         hev_fsh_config_set_remote_port (config, atoi (v3));
+    } else {
+        hev_fsh_config_set_remote_address (config, v1);
+        hev_fsh_config_set_remote_port (config, atoi (v2));
     }
 
     return 0;
@@ -329,10 +335,14 @@ main (int argc, char *argv[])
                 sleep (1);
             }
         } else if (HEV_FSH_CONFIG_MODE_CONNECTOR & mode) {
-            if (HEV_FSH_CONFIG_MODE_CONNECTOR_PORT == mode)
-                client = hev_fsh_client_port_listen_new (config);
-            else
+            if (HEV_FSH_CONFIG_MODE_CONNECTOR_PORT == mode) {
+                if (hev_fsh_config_get_local_port (config))
+                    client = hev_fsh_client_port_listen_new (config);
+                else
+                    client = hev_fsh_client_port_connect_new (config, -1);
+            } else {
                 client = hev_fsh_client_term_connect_new (config);
+            }
 
             hev_task_system_run ();
 
