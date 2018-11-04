@@ -10,9 +10,7 @@
 #ifndef __HEV_FSH_CLIENT_PORT_ACCEPT_H__
 #define __HEV_FSH_CLIENT_PORT_ACCEPT_H__
 
-#include "hev-fsh-config.h"
-#include "hev-fsh-protocol.h"
-#include "hev-fsh-client-base.h"
+#include "hev-fsh-client-accept.h"
 
 typedef struct _HevFshClientPortAccept HevFshClientPortAccept;
 

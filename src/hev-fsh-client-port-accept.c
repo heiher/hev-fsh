@@ -18,30 +18,20 @@
 
 #include "hev-fsh-client-port-accept.h"
 #include "hev-memory-allocator.h"
-#include "hev-task.h"
 #include "hev-task-io-socket.h"
-
-#define TASK_STACK_SIZE (64 * 4096)
 
 struct _HevFshClientPortAccept
 {
-    HevFshClientBase base;
-
-    HevFshToken token;
-
-    HevTask *task;
-    HevFshConfig *config;
+    HevFshClientAccept base;
 };
 
 static void hev_fsh_client_port_accept_task_entry (void *data);
-static void hev_fsh_client_port_accept_destroy (HevFshClientBase *self);
+static void hev_fsh_client_port_accept_destroy (HevFshClientAccept *base);
 
 HevFshClientBase *
 hev_fsh_client_port_accept_new (HevFshConfig *config, HevFshToken token)
 {
     HevFshClientPortAccept *self;
-    const char *address;
-    unsigned int port;
 
     self = hev_malloc0 (sizeof (HevFshClientPortAccept));
     if (!self) {
@@ -49,35 +39,22 @@ hev_fsh_client_port_accept_new (HevFshConfig *config, HevFshToken token)
         return NULL;
     }
 
-    address = hev_fsh_config_get_server_address (config);
-    port = hev_fsh_config_get_server_port (config);
-
-    if (0 > hev_fsh_client_base_construct (&self->base, address, port)) {
-        fprintf (stderr, "Construct client base failed!\n");
+    if (0 > hev_fsh_client_accept_construct (&self->base, config, token)) {
         hev_free (self);
         return NULL;
     }
 
-    self->task = hev_task_new (TASK_STACK_SIZE);
-    if (!self->task) {
-        fprintf (stderr, "Create client port's task failed!\n");
-        hev_free (self);
-        return NULL;
-    }
-
-    self->config = config;
-    memcpy (self->token, token, sizeof (HevFshToken));
     self->base._destroy = hev_fsh_client_port_accept_destroy;
 
-    hev_task_run (self->task, hev_fsh_client_port_accept_task_entry, self);
+    hev_task_run (self->base.task, hev_fsh_client_port_accept_task_entry, self);
 
-    return &self->base;
+    return &self->base.base;
 }
 
 static void
-hev_fsh_client_port_accept_destroy (HevFshClientBase *self)
+hev_fsh_client_port_accept_destroy (HevFshClientAccept *base)
 {
-    hev_free (self);
+    hev_free (base);
 }
 
 static void
@@ -85,36 +62,12 @@ hev_fsh_client_port_accept_task_entry (void *data)
 {
     HevTask *task = hev_task_self ();
     HevFshClientPortAccept *self = data;
-    HevFshMessage message;
-    HevFshMessageToken message_token;
     HevFshMessagePortInfo message_port_info;
     int rfd, lfd;
-    struct msghdr mh;
-    struct iovec iov[2];
     struct sockaddr_in addr;
 
-    rfd = self->base.fd;
-    hev_task_add_fd (task, rfd, EPOLLIN | EPOLLOUT);
-
-    if (hev_task_io_socket_connect (rfd, &self->base.address,
-                                    sizeof (struct sockaddr_in), NULL,
-                                    NULL) < 0)
-        goto quit;
-
-    message.ver = 1;
-    message.cmd = HEV_FSH_CMD_ACCEPT;
-    memcpy (message_token.token, self->token, sizeof (HevFshToken));
-
-    memset (&mh, 0, sizeof (mh));
-    mh.msg_iov = iov;
-    mh.msg_iovlen = 2;
-
-    iov[0].iov_base = &message;
-    iov[0].iov_len = sizeof (message);
-    iov[1].iov_base = &message_token;
-    iov[1].iov_len = sizeof (message_token);
-
-    if (hev_task_io_socket_sendmsg (rfd, &mh, MSG_WAITALL, NULL, NULL) <= 0)
+    rfd = self->base.base.fd;
+    if (0 > hev_fsh_client_accept_send_accept (&self->base))
         goto quit;
 
     /* recv message port info */
@@ -124,7 +77,7 @@ hev_fsh_client_port_accept_task_entry (void *data)
         goto quit;
 
     if (!hev_fsh_config_addr_list_contains (
-            self->config, message_port_info.type, message_port_info.addr,
+            self->base.config, message_port_info.type, message_port_info.addr,
             message_port_info.port))
         goto quit;
 
