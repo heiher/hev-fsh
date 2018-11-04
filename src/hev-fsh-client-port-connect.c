@@ -61,7 +61,8 @@ hev_fsh_client_port_connect_destroy (HevFshClientConnect *base)
 {
     HevFshClientPortConnect *self = (HevFshClientPortConnect *)base;
 
-    close (self->local_fd);
+    if (-1 != self->local_fd)
+        close (self->local_fd);
     hev_free (self);
 }
 
@@ -73,6 +74,7 @@ hev_fsh_client_port_connect_task_entry (void *data)
     HevFshMessagePortInfo message_port_info;
     const char *address;
     unsigned int port;
+    int ifd, ofd;
     ssize_t len;
 
     if (0 > hev_fsh_client_connect_send_connect (&self->base))
@@ -91,13 +93,29 @@ hev_fsh_client_port_connect_task_entry (void *data)
     if (len <= 0)
         goto quit;
 
-    if (fcntl (self->local_fd, F_SETFL, O_NONBLOCK) == -1)
+    if (-1 == self->local_fd) {
+        ifd = 0;
+        ofd = 1;
+    } else {
+        ifd = self->local_fd;
+        ofd = self->local_fd;
+    }
+
+    if (fcntl (ifd, F_SETFL, O_NONBLOCK) == -1)
         goto quit;
 
-    hev_task_add_fd (task, self->local_fd, EPOLLIN | EPOLLOUT);
+    if (ifd != ofd) {
+        if (fcntl (ofd, F_SETFL, O_NONBLOCK) == -1)
+            goto quit;
 
-    hev_task_io_splice (self->base.base.fd, self->base.base.fd, self->local_fd,
-                        self->local_fd, 2048, NULL, NULL);
+        hev_task_add_fd (task, ifd, EPOLLIN);
+        hev_task_add_fd (task, ofd, EPOLLOUT);
+    } else {
+        hev_task_add_fd (task, ifd, EPOLLIN | EPOLLOUT);
+    }
+
+    hev_task_io_splice (self->base.base.fd, self->base.base.fd, ifd, ofd, 2048,
+                        NULL, NULL);
 
 quit:
     hev_fsh_client_base_destroy ((HevFshClientBase *)self);
