@@ -10,8 +10,7 @@
 #ifndef __HEV_FSH_CLIENT_TERM_CONNECT_H__
 #define __HEV_FSH_CLIENT_TERM_CONNECT_H__
 
-#include "hev-fsh-config.h"
-#include "hev-fsh-client-base.h"
+#include "hev-fsh-client-connect.h"
 
 typedef struct _HevFshClientTermConnect HevFshClientTermConnect;
 
