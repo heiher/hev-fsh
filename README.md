@@ -51,10 +51,10 @@ fsh -s -l /var/log/fsh.log
     fsh -f -p 10.0.0.1
 
     # Accept the TCP ports in white list (others rejected)
-    fsh -f -w 192.168.0.1:22,192.168.1.3:80 10.0.0.1
+    fsh -f -p -w 192.168.0.1:22,192.168.1.3:80 10.0.0.1
 
     # Reject the TCP ports in black list (others allowed)
-    fsh -f -b 192.168.0.1:22,192.168.1.3:80 10.0.0.1
+    fsh -f -p -b 192.168.0.1:22,192.168.1.3:80 10.0.0.1
     ```
 
 **Connector** (Another host in private network):
@@ -68,12 +68,13 @@ fsh -s -l /var/log/fsh.log
 * **TCP Port**
     ```bash
     fsh -p [LOCAL_ADDR:]LOCAL_PORT:REMOTE_ADD:REMOTE_PORT SERVER_ADDR[:SERVER_PORT]/TOKEN
+    fsh -p REMOTE_ADD:REMOTE_PORT SERVER_ADDR[:SERVER_PORT]/TOKEN
 
     # Map the TCP port to forwarder's network service
     fsh -p 2200:192.168.0.1:22 10.0.0.1/8b9bf4e7-b2b2-4115-ac97-0c7f69433bc4
     fsh -p 0.0.0.0:2200:192.168.0.1:22 10.0.0.1/8b9bf4e7-b2b2-4115-ac97-0c7f69433bc4
 
-    # Splice to stdin/stdout (Support SSH ProxyCommand)
+    # Splice to stdio (Support SSH ProxyCommand)
     fsh -p 192.168.0.1:22 10.0.0.1/8b9bf4e7-b2b2-4115-ac97-0c7f69433bc4
     ```
 
