@@ -27,9 +27,7 @@ struct _HevFshClientBase
 
 int hev_fsh_client_base_construct (HevFshClientBase *self, const char *address,
                                    unsigned int port);
-int hev_fsh_client_base_construct_with_sockaddr (HevFshClientBase *self,
-                                                 const struct sockaddr *addr,
-                                                 socklen_t addrlen);
+
 void hev_fsh_client_base_destroy (HevFshClientBase *self);
 
 #endif /* __HEV_FSH_CLIENT_BASE_H__ */

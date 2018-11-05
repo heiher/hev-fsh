@@ -67,24 +67,6 @@ hev_fsh_client_base_construct (HevFshClientBase *self, const char *address,
     return 0;
 }
 
-int
-hev_fsh_client_base_construct_with_sockaddr (HevFshClientBase *self,
-                                             const struct sockaddr *addr,
-                                             socklen_t addrlen)
-{
-    self->fd = hev_fsh_client_base_socket ();
-    if (self->fd == -1) {
-        fprintf (stderr, "Create client's socket failed!\n");
-        return -1;
-    }
-
-    memcpy (&self->address, addr, addrlen);
-
-    signal (SIGCHLD, SIG_IGN);
-
-    return 0;
-}
-
 void
 hev_fsh_client_base_destroy (HevFshClientBase *self)
 {
