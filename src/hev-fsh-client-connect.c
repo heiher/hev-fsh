@@ -16,6 +16,7 @@
 #include "hev-fsh-client-connect.h"
 #include "hev-fsh-protocol.h"
 #include "hev-memory-allocator.h"
+#include "hev-task-io.h"
 #include "hev-task-io-socket.h"
 
 #define TASK_STACK_SIZE (64 * 4096)
