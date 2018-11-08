@@ -18,6 +18,7 @@
 
 #include "hev-fsh-client-port-accept.h"
 #include "hev-memory-allocator.h"
+#include "hev-task-io.h"
 #include "hev-task-io-socket.h"
 
 struct _HevFshClientPortAccept
