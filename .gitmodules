@@ -1,6 +1,3 @@
 [submodule "third-part/hev-task-system"]
 	path = third-part/hev-task-system
 	url = https://gitlab.com/hev/hev-task-system
-[submodule "third-part/hev-task-io"]
-	path = third-part/hev-task-io
-	url = https://gitlab.com/hev/hev-task-io
