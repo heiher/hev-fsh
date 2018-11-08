@@ -13,6 +13,7 @@
 #include <netinet/in.h>
 
 #include "hev-fsh-client-accept.h"
+#include "hev-task-io.h"
 #include "hev-task-io-socket.h"
 
 #define TASK_STACK_SIZE (64 * 4096)
