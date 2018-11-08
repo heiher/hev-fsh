@@ -8,6 +8,7 @@
  */
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <fcntl.h>
 #include <string.h>
 #include <unistd.h>
@@ -18,6 +19,7 @@
 
 #include "hev-fsh-client-term-accept.h"
 #include "hev-memory-allocator.h"
+#include "hev-task-io.h"
 #include "hev-task-io-socket.h"
 
 struct _HevFshClientTermAccept
