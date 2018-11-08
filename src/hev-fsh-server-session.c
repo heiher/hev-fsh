@@ -18,6 +18,7 @@
 #include "hev-fsh-protocol.h"
 #include "hev-memory-allocator.h"
 #include "hev-task.h"
+#include "hev-task-io.h"
 #include "hev-task-io-socket.h"
 
 #define SESSION_HP (10)
