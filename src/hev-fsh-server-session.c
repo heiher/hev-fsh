@@ -94,7 +94,7 @@ hev_fsh_server_session_new (int client_fd,
     }
 
     self->base.task = task;
-    hev_task_set_priority (task, 1);
+    hev_task_set_priority (task, 9);
 
     return self;
 }
