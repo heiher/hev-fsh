@@ -2,7 +2,7 @@
  ============================================================================
  Name        : hev-fsh-server-session.c
  Author      : Heiher <r@hev.cc>
- Copyright   : Copyright (c) 2017 everyone.
+ Copyright   : Copyright (c) 2017 - 2018 everyone.
  Description : Fsh server session
  ============================================================================
  */
@@ -170,6 +170,27 @@ sleep_wait (unsigned int milliseconds)
         milliseconds = hev_task_sleep (milliseconds);
 }
 
+static void
+fsh_server_log (HevFshServerSession *self, const char *type)
+{
+    char token[40];
+    struct sockaddr_in addr;
+    socklen_t addr_len = sizeof (addr);
+    time_t rawtime;
+    struct tm *info;
+
+    time (&rawtime);
+    info = localtime (&rawtime);
+    memset (&addr, 0, sizeof (addr));
+    getpeername (self->client_fd, (struct sockaddr *)&addr, &addr_len);
+    hev_fsh_protocol_token_to_string (self->token, token);
+    printf ("[%04d-%02d-%02d %02d:%02d:%02d] %s %s %s:%d\n",
+            1900 + info->tm_year, info->tm_mon + 1, info->tm_mday,
+            info->tm_hour, info->tm_min, info->tm_sec, type, token,
+            inet_ntoa (addr.sin_addr), ntohs (addr.sin_port));
+    fflush (stdout);
+}
+
 static int
 fsh_server_read_message (HevFshServerSession *self)
 {
@@ -200,12 +221,6 @@ fsh_server_read_message (HevFshServerSession *self)
 static int
 fsh_server_do_login (HevFshServerSession *self)
 {
-    char token_str[40];
-    struct sockaddr_in addr;
-    socklen_t addr_len = sizeof (addr);
-    time_t rawtime;
-    struct tm *info;
-
     if (1 == self->msg_ver) {
         hev_fsh_protocol_token_generate (self->token);
     } else {
@@ -230,16 +245,7 @@ fsh_server_do_login (HevFshServerSession *self)
         }
     }
 
-    time (&rawtime);
-    info = localtime (&rawtime);
-    memset (&addr, 0, sizeof (addr));
-    getpeername (self->client_fd, (struct sockaddr *)&addr, &addr_len);
-    hev_fsh_protocol_token_to_string (self->token, token_str);
-    printf ("[%04d-%02d-%02d %02d:%02d:%02d] L %s %s:%d\n",
-            1900 + info->tm_year, info->tm_mon + 1, info->tm_mday,
-            info->tm_hour, info->tm_min, info->tm_sec, token_str,
-            inet_ntoa (addr.sin_addr), ntohs (addr.sin_port));
-    fflush (stdout);
+    fsh_server_log (self, "L");
 
     return STEP_WRITE_MESSAGE_TOKEN;
 }
@@ -301,22 +307,8 @@ fsh_server_write_message_connect (HevFshServerSession *self)
     HevFshMessageToken message_token;
     struct msghdr mh;
     struct iovec iov[2];
-    char token_str[40];
-    struct sockaddr_in addr;
-    socklen_t addr_len = sizeof (addr);
-    time_t rawtime;
-    struct tm *info;
 
-    time (&rawtime);
-    info = localtime (&rawtime);
-    memset (&addr, 0, sizeof (addr));
-    getpeername (self->client_fd, (struct sockaddr *)&addr, &addr_len);
-    hev_fsh_protocol_token_to_string (self->token, token_str);
-    printf ("[%04d-%02d-%02d %02d:%02d:%02d] C %s %s:%d\n",
-            1900 + info->tm_year, info->tm_mon + 1, info->tm_mday,
-            info->tm_hour, info->tm_min, info->tm_sec, token_str,
-            inet_ntoa (addr.sin_addr), ntohs (addr.sin_port));
-    fflush (stdout);
+    fsh_server_log (self, "C");
 
     session =
         fsh_server_find_session_by_token (self, TYPE_FORWARD, self->token);
@@ -413,6 +405,8 @@ fsh_server_do_splice (HevFshServerSession *self)
 static int
 fsh_server_close_session (HevFshServerSession *self)
 {
+    fsh_server_log (self, "D");
+
     if (self->remote_fd >= 0)
         close (self->remote_fd);
     if (self->client_fd >= 0)
