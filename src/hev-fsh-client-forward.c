@@ -11,6 +11,7 @@
 #include <errno.h>
 #include <string.h>
 #include <unistd.h>
+#include <sys/ioctl.h>
 #include <sys/types.h>
 #include <netinet/in.h>
 
@@ -156,10 +157,14 @@ hev_fsh_client_forward_task_entry (void *data)
     mode = hev_fsh_config_get_mode (self->config);
 
     for (;;) {
+        int bytes;
+
         sleep_ms = hev_task_sleep (sleep_ms);
 
-        len = recv (sock_fd, &message, sizeof (message), MSG_PEEK);
-        if (len == -1 && errno == EAGAIN) {
+        if (-1 == ioctl (sock_fd, FIONREAD, &bytes))
+            return;
+
+        if (0 == bytes) {
             /* timeout */
             if (0 == sleep_ms && wait_keep_alive) {
                 printf ("Connection lost!\n");
