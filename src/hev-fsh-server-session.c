@@ -405,12 +405,12 @@ fsh_server_do_splice (HevFshServerSession *self)
 static int
 fsh_server_close_session (HevFshServerSession *self)
 {
-    fsh_server_log (self, "D");
-
     if (self->remote_fd >= 0)
         close (self->remote_fd);
-    if (self->client_fd >= 0)
+    if (self->client_fd >= 0) {
+        fsh_server_log (self, "D");
         close (self->client_fd);
+    }
 
     self->notify (self, self->notify_data);
     hev_fsh_server_session_unref (self);
