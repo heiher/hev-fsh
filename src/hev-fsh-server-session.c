@@ -245,6 +245,7 @@ fsh_server_do_login (HevFshServerSession *self)
         }
     }
 
+    self->type = TYPE_FORWARD;
     fsh_server_log (self, "L");
 
     return STEP_WRITE_MESSAGE_TOKEN;
@@ -275,8 +276,6 @@ fsh_server_write_message_token (HevFshServerSession *self)
                                     fsh_task_io_yielder, self) <= 0)
         return STEP_CLOSE_SESSION;
 
-    self->type = TYPE_FORWARD;
-
     return STEP_READ_MESSAGE;
 }
 
@@ -293,6 +292,7 @@ fsh_server_do_connect (HevFshServerSession *self)
     if (len <= 0)
         return STEP_CLOSE_SESSION;
 
+    self->type = TYPE_CONNECT;
     memcpy (self->token, message_token.token, sizeof (HevFshToken));
 
     return STEP_WRITE_MESSAGE_CONNECT;
@@ -332,8 +332,6 @@ fsh_server_write_message_connect (HevFshServerSession *self)
     if (hev_task_io_socket_sendmsg (fs_session->client_fd, &mh, MSG_WAITALL,
                                     fsh_task_io_yielder, self) <= 0)
         return STEP_CLOSE_SESSION;
-
-    self->type = TYPE_CONNECT;
 
     return STEP_DO_SPLICE;
 }
@@ -405,12 +403,13 @@ fsh_server_do_splice (HevFshServerSession *self)
 static int
 fsh_server_close_session (HevFshServerSession *self)
 {
+    if (self->type)
+        fsh_server_log (self, "D");
+
     if (self->remote_fd >= 0)
         close (self->remote_fd);
-    if (self->client_fd >= 0) {
-        fsh_server_log (self, "D");
+    if (self->client_fd >= 0)
         close (self->client_fd);
-    }
 
     self->notify (self, self->notify_data);
     hev_fsh_server_session_unref (self);
