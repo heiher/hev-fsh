@@ -15,20 +15,18 @@
 #include <arpa/inet.h>
 
 #include "hev-fsh-client-base.h"
+#include "hev-task.h"
+#include "hev-task-io.h"
+#include "hev-task-io-socket.h"
 
 static int
 hev_fsh_client_base_socket (void)
 {
     int fd, flags;
 
-    fd = socket (AF_INET, SOCK_STREAM, 0);
+    fd = hev_task_io_socket_socket (AF_INET, SOCK_STREAM, 0);
     if (fd == -1)
         return -1;
-
-    if (fcntl (fd, F_SETFL, O_NONBLOCK) == -1) {
-        close (fd);
-        return -1;
-    }
 
     flags = fcntl (fd, F_GETFD);
     if (flags == -1) {
