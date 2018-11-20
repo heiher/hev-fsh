@@ -9,7 +9,6 @@
 
 #include <stdio.h>
 #include <errno.h>
-#include <fcntl.h>
 #include <string.h>
 #include <unistd.h>
 #include <sys/socket.h>
@@ -57,7 +56,7 @@ hev_fsh_server_new (HevFshConfig *config)
     unsigned int port;
     struct sockaddr_in addr;
 
-    fd = socket (AF_INET, SOCK_STREAM, 0);
+    fd = hev_task_io_socket_socket (AF_INET, SOCK_STREAM, 0);
     if (fd == -1) {
         fprintf (stderr, "Create socket failed!\n");
         return NULL;
@@ -67,12 +66,6 @@ hev_fsh_server_new (HevFshConfig *config)
                       sizeof (reuseaddr));
     if (ret == -1) {
         fprintf (stderr, "Set reuse address failed!\n");
-        close (fd);
-        return NULL;
-    }
-    ret = fcntl (fd, F_SETFL, O_NONBLOCK);
-    if (ret == -1) {
-        fprintf (stderr, "Set non-blocking failed!\n");
         close (fd);
         return NULL;
     }
@@ -178,7 +171,7 @@ hev_fsh_server_task_entry (void *data)
     hev_task_add_fd (task, self->fd, EPOLLIN);
 
     for (;;) {
-        int client_fd, ret;
+        int client_fd;
         struct sockaddr_in addr;
         struct sockaddr *in_addr = (struct sockaddr *)&addr;
         socklen_t addr_len = sizeof (addr);
@@ -197,12 +190,6 @@ hev_fsh_server_task_entry (void *data)
         printf ("New client %d enter from %s:%u\n", client_fd,
                 inet_ntoa (addr.sin_addr), ntohs (addr.sin_port));
 #endif
-
-        ret = fcntl (client_fd, F_SETFL, O_NONBLOCK);
-        if (ret == -1) {
-            fprintf (stderr, "Set non-blocking failed!\n");
-            close (client_fd);
-        }
 
         session =
             hev_fsh_server_session_new (client_fd, session_close_handler, self);
