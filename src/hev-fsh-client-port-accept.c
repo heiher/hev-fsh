@@ -9,7 +9,6 @@
 
 #include <stdio.h>
 #include <errno.h>
-#include <fcntl.h>
 #include <string.h>
 #include <unistd.h>
 #include <sys/types.h>
@@ -92,12 +91,9 @@ hev_fsh_client_port_accept_task_entry (void *data)
     }
     addr.sin_port = message_port_info.port;
 
-    lfd = socket (AF_INET, SOCK_STREAM, 0);
+    lfd = hev_task_io_socket_socket (AF_INET, SOCK_STREAM, 0);
     if (0 > lfd)
         goto quit;
-
-    if (fcntl (lfd, F_SETFL, O_NONBLOCK) == -1)
-        goto quit_close_fd;
 
     hev_task_add_fd (task, lfd, EPOLLIN | EPOLLOUT);
 
