@@ -30,7 +30,7 @@
 
 #define MAJOR_VERSION (3)
 #define MINOR_VERSION (5)
-#define MICRO_VERSION (4)
+#define MICRO_VERSION (5)
 
 static void
 show_help (void)
