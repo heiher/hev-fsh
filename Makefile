@@ -7,7 +7,7 @@ PP=$(CROSS_PREFIX)cpp
 CC=$(CROSS_PREFIX)gcc
 STRIP=$(CROSS_PREFIX)strip
 MARCH:=native
-CCFLAGS=-march=$(MARCH) -O3 -Wall -Werror \
+CCFLAGS=-march=$(MARCH) -O3 -pipe -Wall -Werror \
 		-I$(THIRDPARTDIR)/hev-task-system/include \
 		`pkg-config --cflags uuid`
 LDFLAGS=-L$(THIRDPARTDIR)/hev-task-system/bin -lhev-task-system \
