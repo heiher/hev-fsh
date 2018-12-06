@@ -15,7 +15,14 @@
 #include <sys/types.h>
 #include <sys/ioctl.h>
 #include <pwd.h>
+#if defined(__linux__)
 #include <pty.h>
+#else
+#include <sys/types.h>
+#include <sys/ioctl.h>
+#include <termios.h>
+#include <libutil.h>
+#endif
 
 #include "hev-fsh-client-term-accept.h"
 #include "hev-memory-allocator.h"
@@ -128,7 +135,7 @@ hev_fsh_client_term_accept_task_entry (void *data)
     if (fcntl (pfd, F_SETFL, O_NONBLOCK) == -1)
         goto quit_close_fd;
 
-    hev_task_add_fd (task, pfd, EPOLLIN | EPOLLOUT);
+    hev_task_add_fd (task, pfd, POLLIN | POLLOUT);
 
     hev_task_io_splice (sfd, sfd, pfd, pfd, 2048, NULL, NULL);
 
