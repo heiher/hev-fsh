@@ -104,7 +104,7 @@ hev_fsh_client_port_listen_task_entry (void *data)
     HevTask *task = hev_task_self ();
     HevFshClientPortListen *self = data;
 
-    hev_task_add_fd (task, self->base.fd, EPOLLIN);
+    hev_task_add_fd (task, self->base.fd, POLLIN);
 
     for (;;) {
         int fd;
