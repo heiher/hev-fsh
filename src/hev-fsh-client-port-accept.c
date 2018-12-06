@@ -95,7 +95,7 @@ hev_fsh_client_port_accept_task_entry (void *data)
     if (0 > lfd)
         goto quit;
 
-    hev_task_add_fd (task, lfd, EPOLLIN | EPOLLOUT);
+    hev_task_add_fd (task, lfd, POLLIN | POLLOUT);
 
     if (0 > hev_task_io_socket_connect (lfd, (struct sockaddr *)&addr,
                                         sizeof (addr), NULL, NULL))
