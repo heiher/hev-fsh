@@ -322,31 +322,25 @@ main (int argc, char *argv[])
 
         hev_fsh_server_destroy (server);
     } else {
-        HevFshClientBase *client;
-
         if (HEV_FSH_CONFIG_MODE_FORWARDER & mode) {
             for (;;) {
-                client = hev_fsh_client_forward_new (config);
+                hev_fsh_client_forward_new (config);
 
                 hev_task_system_run ();
-
-                hev_fsh_client_base_destroy (client);
 
                 sleep (1);
             }
         } else if (HEV_FSH_CONFIG_MODE_CONNECTOR & mode) {
             if (HEV_FSH_CONFIG_MODE_CONNECTOR_PORT == mode) {
                 if (hev_fsh_config_get_local_port (config))
-                    client = hev_fsh_client_port_listen_new (config);
+                    hev_fsh_client_port_listen_new (config);
                 else
-                    client = hev_fsh_client_port_connect_new (config, -1);
+                    hev_fsh_client_port_connect_new (config, -1);
             } else {
-                client = hev_fsh_client_term_connect_new (config);
+                hev_fsh_client_term_connect_new (config);
             }
 
             hev_task_system_run ();
-
-            hev_fsh_client_base_destroy (client);
         }
     }
 
