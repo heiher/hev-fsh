@@ -68,7 +68,7 @@ hev_fsh_client_accept_send_accept (HevFshClientAccept *self)
     int fd;
 
     fd = self->base.fd;
-    hev_task_add_fd (task, fd, EPOLLIN | EPOLLOUT);
+    hev_task_add_fd (task, fd, POLLIN | POLLOUT);
 
     if (hev_task_io_socket_connect (fd, &self->base.address,
                                     sizeof (struct sockaddr_in), NULL,
