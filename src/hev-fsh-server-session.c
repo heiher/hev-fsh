@@ -359,7 +359,7 @@ fsh_server_do_accept (HevFshServerSession *self)
     fs_session = (HevFshServerSession *)session;
     fs_session->remote_fd = self->client_fd;
     hev_task_del_fd (task, self->client_fd);
-    hev_task_add_fd (session->task, fs_session->remote_fd, EPOLLIN | EPOLLOUT);
+    hev_task_add_fd (session->task, fs_session->remote_fd, POLLIN | POLLOUT);
     hev_task_wakeup (session->task);
 
     self->client_fd = -1;
@@ -424,7 +424,7 @@ hev_fsh_server_session_task_entry (void *data)
     HevFshServerSession *self = data;
     int step = STEP_READ_MESSAGE;
 
-    hev_task_add_fd (task, self->client_fd, EPOLLIN | EPOLLOUT);
+    hev_task_add_fd (task, self->client_fd, POLLIN | POLLOUT);
 
     while (step) {
         switch (step) {
