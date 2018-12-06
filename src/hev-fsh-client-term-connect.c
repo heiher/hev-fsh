@@ -91,8 +91,8 @@ hev_fsh_client_term_connect_task_entry (void *data)
     if (fcntl (1, F_SETFL, O_NONBLOCK) == -1)
         return;
 
-    hev_task_add_fd (task, 0, EPOLLIN);
-    hev_task_add_fd (task, 1, EPOLLOUT);
+    hev_task_add_fd (task, 0, POLLIN);
+    hev_task_add_fd (task, 1, POLLOUT);
 
     if (tcgetattr (0, &term) == -1)
         return;
