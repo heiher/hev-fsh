@@ -13,6 +13,7 @@
 #include <string.h>
 #include <signal.h>
 #include <arpa/inet.h>
+#include <netinet/in.h>
 
 #include "hev-fsh-client-base.h"
 #include "hev-task.h"
