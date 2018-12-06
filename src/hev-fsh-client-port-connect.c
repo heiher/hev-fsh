@@ -109,10 +109,10 @@ hev_fsh_client_port_connect_task_entry (void *data)
         if (fcntl (ofd, F_SETFL, O_NONBLOCK) == -1)
             goto quit;
 
-        hev_task_add_fd (task, ifd, EPOLLIN);
-        hev_task_add_fd (task, ofd, EPOLLOUT);
+        hev_task_add_fd (task, ifd, POLLIN);
+        hev_task_add_fd (task, ofd, POLLOUT);
     } else {
-        hev_task_add_fd (task, ifd, EPOLLIN | EPOLLOUT);
+        hev_task_add_fd (task, ifd, POLLIN | POLLOUT);
     }
 
     hev_task_io_splice (self->base.base.fd, self->base.base.fd, ifd, ofd, 2048,
