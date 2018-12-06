@@ -68,7 +68,7 @@ hev_fsh_client_connect_send_connect (HevFshClientConnect *self)
     const char *token;
     ssize_t len;
 
-    hev_task_add_fd (task, self->base.fd, EPOLLIN | EPOLLOUT);
+    hev_task_add_fd (task, self->base.fd, POLLIN | POLLOUT);
 
     if (hev_task_io_socket_connect (self->base.fd, &self->base.address,
                                     sizeof (struct sockaddr_in), NULL,
