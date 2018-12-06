@@ -97,7 +97,7 @@ hev_fsh_client_forward_task_entry (void *data)
     ssize_t len;
 
     sock_fd = self->base.fd;
-    hev_task_add_fd (task, sock_fd, EPOLLIN | EPOLLOUT);
+    hev_task_add_fd (task, sock_fd, POLLIN | POLLOUT);
 
     if (hev_task_io_socket_connect (sock_fd, &self->base.address,
                                     sizeof (struct sockaddr_in), NULL,
