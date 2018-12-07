@@ -17,9 +17,9 @@
 #include <pwd.h>
 #if defined(__linux__)
 #include <pty.h>
+#elif defined(__APPLE__) || (__MACH__)
+#include <util.h>
 #else
-#include <sys/types.h>
-#include <sys/ioctl.h>
 #include <termios.h>
 #include <libutil.h>
 #endif
