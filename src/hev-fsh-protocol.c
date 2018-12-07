@@ -7,7 +7,11 @@
  ============================================================================
  */
 
+#if defined(__APPLE__) || (__MACH__)
+#include <uuid/uuid.h>
+#else
 #include <uuid.h>
+#endif
 
 #include "hev-fsh-protocol.h"
 
