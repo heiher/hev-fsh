@@ -29,10 +29,10 @@ LDOBJS=$(patsubst $(SRCDIR)/%.c,$(BUILDDIR)/%.o,$(CCSRCS)) \
 	   $(patsubst $(SRCDIR)/%.S,$(BUILDDIR)/%.o,$(ASSRCS))
 DEPEND=$(LDOBJS:.o=.dep)
 
-BUILDMSG="\e[1;31mBUILD\e[0m $<"
-LINKMSG="\e[1;34mLINK\e[0m  \e[1;32m$@\e[0m"
-STRIPMSG="\e[1;34mSTRIP\e[0m \e[1;32m$@\e[0m"
-CLEANMSG="\e[1;34mCLEAN\e[0m $(PROJECT)"
+BUILDMSG="\e[1;31mBUILD\e[0m %s\n"
+LINKMSG="\e[1;34mLINK\e[0m  \e[1;32m%s\e[0m\n"
+STRIPMSG="\e[1;34mSTRIP\e[0m \e[1;32m%s\e[0m\n"
+CLEANMSG="\e[1;34mCLEAN\e[0m %s\n"
 
 V :=
 ECHO_PREFIX := @
@@ -52,14 +52,14 @@ tp-clean : $(THIRDPARTS)
 
 clean : tp-clean
 	$(ECHO_PREFIX) $(RM) -rf $(BINDIR) $(BUILDDIR)
-	@echo -e $(CLEANMSG)
+	@printf $(CLEANMSG) $(PROJECT)
 
 $(TARGET) : $(LDOBJS)
 	$(ECHO_PREFIX) mkdir -p $(dir $@)
 	$(ECHO_PREFIX) $(CC) -o $@ $^ $(LDFLAGS)
-	@echo -e $(LINKMSG)
+	@printf $(LINKMSG) $@
 	$(ECHO_PREFIX) $(STRIP) $@
-	@echo -e $(STRIPMSG)
+	@printf $(STRIPMSG) $@
 
 $(BUILDDIR)/%.dep : $(SRCDIR)/%.c
 	$(ECHO_PREFIX) mkdir -p $(dir $@)
@@ -68,7 +68,7 @@ $(BUILDDIR)/%.dep : $(SRCDIR)/%.c
 $(BUILDDIR)/%.o : $(SRCDIR)/%.c
 	$(ECHO_PREFIX) mkdir -p $(dir $@)
 	$(ECHO_PREFIX) $(CC) $(CCFLAGS) -c -o $@ $<
-	@echo -e $(BUILDMSG)
+	@printf $(BUILDMSG) $<
 
 ifneq ($(MAKECMDGOALS),clean)
 -include $(DEPEND)
