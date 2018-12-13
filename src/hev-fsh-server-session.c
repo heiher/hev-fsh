@@ -237,10 +237,16 @@ fsh_server_do_login (HevFshServerSession *self)
 
         if (0 == memcmp (zero_token, msg_token.token, sizeof (HevFshToken))) {
             hev_fsh_protocol_token_generate (self->token);
-        } else if (fsh_server_find_session_by_token (self, TYPE_FORWARD,
-                                                     msg_token.token)) {
-            hev_fsh_protocol_token_generate (self->token);
         } else {
+            HevFshServerSessionBase *s;
+
+            s = fsh_server_find_session_by_token (self, TYPE_FORWARD,
+                                                  msg_token.token);
+            if (s) {
+                s->hp = 0;
+                hev_task_wakeup (s->task);
+            }
+
             memcpy (self->token, msg_token.token, sizeof (HevFshToken));
         }
     }
