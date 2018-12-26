@@ -79,7 +79,7 @@ hev_fsh_client_port_connect_task_entry (void *data)
     ssize_t len;
 
     if (0 > hev_fsh_client_connect_send_connect (&self->base))
-        goto quit;
+        return;
 
     address = hev_fsh_config_get_remote_address (self->base.config);
     port = hev_fsh_config_get_remote_port (self->base.config);
@@ -92,7 +92,7 @@ hev_fsh_client_port_connect_task_entry (void *data)
                                    sizeof (message_port_info), MSG_WAITALL,
                                    NULL, NULL);
     if (len <= 0)
-        goto quit;
+        return;
 
     if (-1 == self->local_fd) {
         ifd = 0;
@@ -103,11 +103,11 @@ hev_fsh_client_port_connect_task_entry (void *data)
     }
 
     if (fcntl (ifd, F_SETFL, O_NONBLOCK) == -1)
-        goto quit;
+        return;
 
     if (ifd != ofd) {
         if (fcntl (ofd, F_SETFL, O_NONBLOCK) == -1)
-            goto quit;
+            return;
 
         hev_task_add_fd (task, ifd, POLLIN);
         hev_task_add_fd (task, ofd, POLLOUT);
@@ -117,7 +117,4 @@ hev_fsh_client_port_connect_task_entry (void *data)
 
     hev_task_io_splice (self->base.base.fd, self->base.base.fd, ifd, ofd, 2048,
                         NULL, NULL);
-
-quit:
-    hev_fsh_client_base_destroy ((HevFshClientBase *)self);
 }
