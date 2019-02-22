@@ -108,8 +108,12 @@ hev_fsh_client_term_accept_task_entry (void *data)
 
                 pwd = getpwnam (user);
                 if (pwd) {
-                    setgid (pwd->pw_gid);
-                    setuid (pwd->pw_uid);
+                    if (setgid (pwd->pw_gid)) {
+                        /* ignore return value */
+                    }
+                    if (setuid (pwd->pw_uid)) {
+                        /* ignore return value */
+                    }
                 }
             } else {
                 setsid ();
