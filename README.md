@@ -1,5 +1,7 @@
 # HevFsh
 
+[![status](https://gitlab.com/hev/hev-fsh/badges/master/pipeline.svg)](https://gitlab.com/hev/hev-fsh/commits/master)
+
 HevFsh is a solution for connect to remote shell in local networks.
 
 ## How to Build
