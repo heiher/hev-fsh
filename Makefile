@@ -21,6 +21,7 @@ THIRDPARTDIR=third-part
 
 TARGET=$(BINDIR)/hev-fsh
 THIRDPARTS=$(THIRDPARTDIR)/hev-task-system
+THIRDPART_TARGETS=$(THIRDPARTDIR)/hev-task-system/bin/libhev-task-system.a
 
 -include build.mk
 CCSRCS=$(filter %.c,$(SRCFILES))
@@ -40,11 +41,11 @@ ifeq ($(V),1)
 	undefine ECHO_PREFIX
 endif
 
-.PHONY: all clean tp-all tp-clean
+.PHONY: all clean tp-clean
 
-all : tp-all $(TARGET)
+all : $(TARGET)
 
-tp-all : $(THIRDPARTS)
+$(THIRDPART_TARGETS) : $(THIRDPARTS)
 	@$(foreach dir,$^,$(MAKE) --no-print-directory -C $(dir);)
 
 tp-clean : $(THIRDPARTS)
@@ -54,9 +55,9 @@ clean : tp-clean
 	$(ECHO_PREFIX) $(RM) -rf $(BINDIR) $(BUILDDIR)
 	@printf $(CLEANMSG) $(PROJECT)
 
-$(TARGET) : $(LDOBJS)
+$(TARGET) : $(LDOBJS) $(THIRDPART_TARGETS)
 	$(ECHO_PREFIX) mkdir -p $(dir $@)
-	$(ECHO_PREFIX) $(CC) -o $@ $^ $(LDFLAGS)
+	$(ECHO_PREFIX) $(CC) -o $@ $(LDOBJS) $(LDFLAGS)
 	@printf $(LINKMSG) $@
 	$(ECHO_PREFIX) $(STRIP) $@
 	@printf $(STRIPMSG) $@
