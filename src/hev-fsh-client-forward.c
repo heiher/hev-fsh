@@ -159,7 +159,6 @@ hev_fsh_client_forward_task_entry (void *data)
     for (;;) {
         int bytes;
 
-        hev_task_res_fd (task, sock_fd, POLLIN);
         sleep_ms = hev_task_sleep (sleep_ms);
 
         if (-1 == ioctl (sock_fd, FIONREAD, &bytes))
