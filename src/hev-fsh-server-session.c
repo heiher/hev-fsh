@@ -22,7 +22,7 @@
 #include "hev-task-io-socket.h"
 
 #define SESSION_HP (10)
-#define TASK_STACK_SIZE (3 * 4096)
+#define TASK_STACK_SIZE (8192)
 
 static void hev_fsh_server_session_task_entry (void *data);
 
