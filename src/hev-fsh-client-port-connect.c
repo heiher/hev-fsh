@@ -115,6 +115,6 @@ hev_fsh_client_port_connect_task_entry (void *data)
         hev_task_add_fd (task, ifd, POLLIN | POLLOUT);
     }
 
-    hev_task_io_splice (self->base.base.fd, self->base.base.fd, ifd, ofd, 2048,
+    hev_task_io_splice (self->base.base.fd, self->base.base.fd, ifd, ofd, 8192,
                         NULL, NULL);
 }
