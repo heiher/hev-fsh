@@ -141,7 +141,7 @@ hev_fsh_client_term_accept_task_entry (void *data)
 
     hev_task_add_fd (task, pfd, POLLIN | POLLOUT);
 
-    hev_task_io_splice (sfd, sfd, pfd, pfd, 2048, NULL, NULL);
+    hev_task_io_splice (sfd, sfd, pfd, pfd, 8192, NULL, NULL);
 
 quit_close_fd:
     close (pfd);
