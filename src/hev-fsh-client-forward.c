@@ -24,7 +24,7 @@
 #include "hev-task-io.h"
 #include "hev-task-io-socket.h"
 
-#define TASK_STACK_SIZE (64 * 4096)
+#define TASK_STACK_SIZE (8192)
 #define KEEP_ALIVE_INTERVAL (30 * 1000)
 
 struct _HevFshClientForward
