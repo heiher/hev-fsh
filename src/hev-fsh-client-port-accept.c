@@ -101,7 +101,7 @@ hev_fsh_client_port_accept_task_entry (void *data)
                                         sizeof (addr), NULL, NULL))
         goto quit_close_fd;
 
-    hev_task_io_splice (rfd, rfd, lfd, lfd, 2048, NULL, NULL);
+    hev_task_io_splice (rfd, rfd, lfd, lfd, 8192, NULL, NULL);
 
 quit_close_fd:
     close (lfd);
