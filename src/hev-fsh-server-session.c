@@ -401,7 +401,7 @@ fsh_server_do_splice (HevFshServerSession *self)
     }
 
     hev_task_io_splice (self->client_fd, self->client_fd, self->remote_fd,
-                        self->remote_fd, 2048, fsh_task_io_yielder, self);
+                        self->remote_fd, 8192, fsh_task_io_yielder, self);
 
     return STEP_CLOSE_SESSION;
 }
