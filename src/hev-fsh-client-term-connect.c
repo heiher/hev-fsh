@@ -103,7 +103,7 @@ hev_fsh_client_term_connect_task_entry (void *data)
     if (tcsetattr (0, TCSADRAIN, &term_rsh) == -1)
         return;
 
-    hev_task_io_splice (self->base.base.fd, self->base.base.fd, 0, 1, 2048,
+    hev_task_io_splice (self->base.base.fd, self->base.base.fd, 0, 1, 8192,
                         NULL, NULL);
 
     tcsetattr (0, TCSADRAIN, &term);
