@@ -21,7 +21,7 @@
 #include "hev-task-io.h"
 #include "hev-task-io-socket.h"
 
-#define TASK_STACK_SIZE (64 * 4096)
+#define TASK_STACK_SIZE (8192)
 
 struct _HevFshClientPortListen
 {
