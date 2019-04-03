@@ -16,7 +16,7 @@
 #include "hev-task-io.h"
 #include "hev-task-io-socket.h"
 
-#define TASK_STACK_SIZE (8192)
+#define TASK_STACK_SIZE (16384)
 
 static void hev_fsh_client_accept_destroy (HevFshClientBase *base);
 
