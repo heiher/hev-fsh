@@ -20,6 +20,8 @@
 #include "hev-task-io.h"
 #include "hev-task-io-socket.h"
 
+#define fsh_task_io_yielder hev_fsh_client_base_task_io_yielder
+
 struct _HevFshClientPortAccept
 {
     HevFshClientAccept base;
@@ -67,13 +69,13 @@ hev_fsh_client_port_accept_task_entry (void *data)
     struct sockaddr_in addr;
 
     rfd = self->base.base.fd;
-    if (0 > hev_fsh_client_accept_send_accept (&self->base))
+    if (hev_fsh_client_accept_send_accept (&self->base) < 0)
         goto quit;
 
     /* recv message port info */
-    if (0 > hev_task_io_socket_recv (rfd, &message_port_info,
-                                     sizeof (message_port_info), MSG_WAITALL,
-                                     NULL, NULL))
+    if (hev_task_io_socket_recv (rfd, &message_port_info,
+                                 sizeof (message_port_info), MSG_WAITALL,
+                                 fsh_task_io_yielder, NULL) <= 0)
         goto quit;
 
     if (!hev_fsh_config_addr_list_contains (
@@ -97,11 +99,12 @@ hev_fsh_client_port_accept_task_entry (void *data)
 
     hev_task_add_fd (task, lfd, POLLIN | POLLOUT);
 
-    if (0 > hev_task_io_socket_connect (lfd, (struct sockaddr *)&addr,
-                                        sizeof (addr), NULL, NULL))
+    if (hev_task_io_socket_connect (lfd, (struct sockaddr *)&addr,
+                                    sizeof (addr), fsh_task_io_yielder,
+                                    NULL) < 0)
         goto quit_close_fd;
 
-    hev_task_io_splice (rfd, rfd, lfd, lfd, 8192, NULL, NULL);
+    hev_task_io_splice (rfd, rfd, lfd, lfd, 8192, fsh_task_io_yielder, NULL);
 
 quit_close_fd:
     close (lfd);
