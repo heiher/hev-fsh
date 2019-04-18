@@ -20,6 +20,7 @@
 #include "hev-task-io-socket.h"
 
 #define TASK_STACK_SIZE (8192)
+#define fsh_task_io_yielder hev_fsh_client_base_task_io_yielder
 
 static void hev_fsh_client_connect_destroy (HevFshClientBase *base);
 
@@ -71,8 +72,8 @@ hev_fsh_client_connect_send_connect (HevFshClientConnect *self)
     hev_task_add_fd (task, self->base.fd, POLLIN | POLLOUT);
 
     if (hev_task_io_socket_connect (self->base.fd, &self->base.address,
-                                    sizeof (struct sockaddr_in), NULL,
-                                    NULL) < 0) {
+                                    sizeof (struct sockaddr_in),
+                                    fsh_task_io_yielder, NULL) < 0) {
         fprintf (stderr, "Connect to server failed!\n");
         return -1;
     }
@@ -80,7 +81,7 @@ hev_fsh_client_connect_send_connect (HevFshClientConnect *self)
     message.ver = 1;
     message.cmd = HEV_FSH_CMD_CONNECT;
     len = hev_task_io_socket_send (self->base.fd, &message, sizeof (message),
-                                   MSG_WAITALL, NULL, NULL);
+                                   MSG_WAITALL, fsh_task_io_yielder, NULL);
     if (len <= 0)
         return -1;
 
@@ -92,8 +93,8 @@ hev_fsh_client_connect_send_connect (HevFshClientConnect *self)
 
     /* send message token */
     len = hev_task_io_socket_send (self->base.fd, &message_token,
-                                   sizeof (message_token), MSG_WAITALL, NULL,
-                                   NULL);
+                                   sizeof (message_token), MSG_WAITALL,
+                                   fsh_task_io_yielder, NULL);
     if (len <= 0)
         return -1;
 
