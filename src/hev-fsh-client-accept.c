@@ -17,6 +17,7 @@
 #include "hev-task-io-socket.h"
 
 #define TASK_STACK_SIZE (16384)
+#define fsh_task_io_yielder hev_fsh_client_base_task_io_yielder
 
 static void hev_fsh_client_accept_destroy (HevFshClientBase *base);
 
@@ -71,8 +72,8 @@ hev_fsh_client_accept_send_accept (HevFshClientAccept *self)
     hev_task_add_fd (task, fd, POLLIN | POLLOUT);
 
     if (hev_task_io_socket_connect (fd, &self->base.address,
-                                    sizeof (struct sockaddr_in), NULL,
-                                    NULL) < 0)
+                                    sizeof (struct sockaddr_in),
+                                    fsh_task_io_yielder, NULL) < 0)
         return -1;
 
     message.ver = 1;
@@ -88,7 +89,8 @@ hev_fsh_client_accept_send_accept (HevFshClientAccept *self)
     iov[1].iov_base = &message_token;
     iov[1].iov_len = sizeof (message_token);
 
-    if (hev_task_io_socket_sendmsg (fd, &mh, MSG_WAITALL, NULL, NULL) <= 0)
+    if (hev_task_io_socket_sendmsg (fd, &mh, MSG_WAITALL, fsh_task_io_yielder,
+                                    NULL) <= 0)
         return -1;
 
     return 0;
