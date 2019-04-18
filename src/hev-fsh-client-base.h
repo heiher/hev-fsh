@@ -10,6 +10,8 @@
 #ifndef __HEV_FSH_CLIENT_BASE_H__
 #define __HEV_FSH_CLIENT_BASE_H__
 
+#include <hev-task.h>
+
 #include <sys/types.h>
 #include <sys/socket.h>
 
@@ -29,5 +31,7 @@ int hev_fsh_client_base_construct (HevFshClientBase *self, const char *address,
                                    unsigned int port);
 
 void hev_fsh_client_base_destroy (HevFshClientBase *self);
+
+int hev_fsh_client_base_task_io_yielder (HevTaskYieldType type, void *data);
 
 #endif /* __HEV_FSH_CLIENT_BASE_H__ */

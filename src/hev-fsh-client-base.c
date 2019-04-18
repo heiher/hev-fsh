@@ -20,6 +20,8 @@
 #include "hev-task-io.h"
 #include "hev-task-io-socket.h"
 
+#define TIMEOUT (30 * 1000)
+
 static int
 hev_fsh_client_base_socket (void)
 {
@@ -72,4 +74,13 @@ hev_fsh_client_base_destroy (HevFshClientBase *self)
     close (self->fd);
     if (self->_destroy)
         self->_destroy (self);
+}
+
+int
+hev_fsh_client_base_task_io_yielder (HevTaskYieldType type, void *data)
+{
+    if (0 == hev_task_sleep (TIMEOUT))
+        return -1;
+
+    return 0;
 }
