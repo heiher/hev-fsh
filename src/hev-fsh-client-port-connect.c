@@ -21,6 +21,8 @@
 #include "hev-task-io.h"
 #include "hev-task-io-socket.h"
 
+#define fsh_task_io_yielder hev_fsh_client_base_task_io_yielder
+
 struct _HevFshClientPortConnect
 {
     HevFshClientConnect base;
@@ -90,7 +92,7 @@ hev_fsh_client_port_connect_task_entry (void *data)
     /* send message port info */
     len = hev_task_io_socket_send (self->base.base.fd, &message_port_info,
                                    sizeof (message_port_info), MSG_WAITALL,
-                                   NULL, NULL);
+                                   fsh_task_io_yielder, NULL);
     if (len <= 0)
         return;
 
@@ -116,5 +118,5 @@ hev_fsh_client_port_connect_task_entry (void *data)
     }
 
     hev_task_io_splice (self->base.base.fd, self->base.base.fd, ifd, ofd, 8192,
-                        NULL, NULL);
+                        fsh_task_io_yielder, NULL);
 }
