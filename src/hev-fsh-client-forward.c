@@ -11,7 +11,6 @@
 #include <errno.h>
 #include <string.h>
 #include <unistd.h>
-#include <sys/ioctl.h>
 #include <sys/types.h>
 #include <netinet/in.h>
 
@@ -25,7 +24,7 @@
 #include "hev-task-io-socket.h"
 
 #define TASK_STACK_SIZE (8192)
-#define KEEP_ALIVE_INTERVAL (30 * 1000)
+#define fsh_task_io_yielder hev_fsh_client_base_task_io_yielder
 
 struct _HevFshClientForward
 {
@@ -90,8 +89,7 @@ hev_fsh_client_forward_task_entry (void *data)
     HevFshClientForward *self = data;
     HevFshMessage message;
     HevFshMessageToken msg_token;
-    int mode, sock_fd, wait_keep_alive = 0;
-    unsigned int sleep_ms = KEEP_ALIVE_INTERVAL;
+    int mode, sock_fd;
     const char *token, *token_src;
     char token_buf[40];
     ssize_t len;
@@ -100,8 +98,8 @@ hev_fsh_client_forward_task_entry (void *data)
     hev_task_add_fd (task, sock_fd, POLLIN | POLLOUT);
 
     if (hev_task_io_socket_connect (sock_fd, &self->base.address,
-                                    sizeof (struct sockaddr_in), NULL,
-                                    NULL) < 0) {
+                                    sizeof (struct sockaddr_in),
+                                    fsh_task_io_yielder, NULL) < 0) {
         fprintf (stderr, "Connect to server failed!\n");
         return;
     }
@@ -112,7 +110,7 @@ hev_fsh_client_forward_task_entry (void *data)
     message.cmd = HEV_FSH_CMD_LOGIN;
 
     len = hev_task_io_socket_send (sock_fd, &message, sizeof (message),
-                                   MSG_WAITALL, NULL, NULL);
+                                   MSG_WAITALL, fsh_task_io_yielder, NULL);
     if (len <= 0)
         return;
 
@@ -124,14 +122,14 @@ hev_fsh_client_forward_task_entry (void *data)
 
         memcpy (msg_token.token, self->token, sizeof (HevFshToken));
         len = hev_task_io_socket_send (sock_fd, &msg_token, sizeof (msg_token),
-                                       MSG_WAITALL, NULL, NULL);
+                                       MSG_WAITALL, fsh_task_io_yielder, NULL);
         if (len <= 0)
             return;
     }
 
     /* recv message token */
     len = hev_task_io_socket_recv (sock_fd, &message, sizeof (message),
-                                   MSG_WAITALL, NULL, NULL);
+                                   MSG_WAITALL, fsh_task_io_yielder, NULL);
     if (len <= 0)
         return;
 
@@ -141,7 +139,7 @@ hev_fsh_client_forward_task_entry (void *data)
     }
 
     len = hev_task_io_socket_recv (sock_fd, &msg_token, sizeof (msg_token),
-                                   MSG_WAITALL, NULL, NULL);
+                                   MSG_WAITALL, fsh_task_io_yielder, NULL);
     if (len <= 0)
         return;
 
@@ -157,50 +155,30 @@ hev_fsh_client_forward_task_entry (void *data)
     mode = hev_fsh_config_get_mode (self->config);
 
     for (;;) {
-        int bytes;
-
-        sleep_ms = hev_task_sleep (sleep_ms);
-
-        if (-1 == ioctl (sock_fd, FIONREAD, &bytes))
-            return;
-
-        if (0 == bytes) {
-            /* timeout */
-            if (0 == sleep_ms && wait_keep_alive) {
-                printf ("Connection lost!\n");
-                return;
-            }
+        /* recv message connect */
+        len = hev_task_io_socket_recv (sock_fd, &message, sizeof (message),
+                                       MSG_WAITALL, fsh_task_io_yielder, NULL);
+        if (len == -2) {
             /* keep alive */
             message.ver = 2;
             message.cmd = HEV_FSH_CMD_KEEP_ALIVE;
             len = hev_task_io_socket_send (sock_fd, &message, sizeof (message),
-                                           MSG_WAITALL, NULL, NULL);
+                                           MSG_WAITALL, fsh_task_io_yielder,
+                                           NULL);
             if (len <= 0)
                 return;
-            wait_keep_alive = 1;
-            sleep_ms = KEEP_ALIVE_INTERVAL;
+            len = hev_task_io_socket_recv (sock_fd, &message, sizeof (message),
+                                           MSG_WAITALL, fsh_task_io_yielder,
+                                           NULL);
+            if ((len <= 0) || (HEV_FSH_CMD_KEEP_ALIVE != message.cmd))
+                return;
             continue;
-        }
-
-        /* recv message connect */
-        len = hev_task_io_socket_recv (sock_fd, &message, sizeof (message),
-                                       MSG_WAITALL, NULL, NULL);
-        if (len <= 0)
-            return;
-
-        switch (message.cmd) {
-        case HEV_FSH_CMD_KEEP_ALIVE:
-            wait_keep_alive = 0;
-            sleep_ms = KEEP_ALIVE_INTERVAL;
-            continue;
-        case HEV_FSH_CMD_CONNECT:
-            break;
-        default:
+        } else if (len <= 0) {
             return;
         }
 
         len = hev_task_io_socket_recv (sock_fd, &msg_token, sizeof (msg_token),
-                                       MSG_WAITALL, NULL, NULL);
+                                       MSG_WAITALL, fsh_task_io_yielder, NULL);
         if (len <= 0)
             return;
 
@@ -211,6 +189,5 @@ hev_fsh_client_forward_task_entry (void *data)
             hev_fsh_client_port_accept_new (self->config, self->token);
         else
             hev_fsh_client_term_accept_new (self->config, self->token);
-        sleep_ms = KEEP_ALIVE_INTERVAL;
     }
 }
