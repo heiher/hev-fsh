@@ -79,8 +79,12 @@ hev_fsh_client_base_destroy (HevFshClientBase *self)
 int
 hev_fsh_client_base_task_io_yielder (HevTaskYieldType type, void *data)
 {
-    if (0 == hev_task_sleep (TIMEOUT))
-        return -1;
+    if (type == HEV_TASK_WAITIO) {
+        if (0 == hev_task_sleep (TIMEOUT))
+            return -1;
+    } else {
+        hev_task_yield (HEV_TASK_YIELD);
+    }
 
     return 0;
 }
