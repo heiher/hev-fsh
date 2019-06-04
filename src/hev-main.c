@@ -13,6 +13,7 @@
 #include <signal.h>
 #include <string.h>
 #include <fcntl.h>
+#include <netdb.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/socket.h>
@@ -275,6 +276,24 @@ setup_log (int mode, const char *log)
     return 0;
 }
 
+static int
+resolve_domain (HevFshConfig *config)
+{
+    static char address[64];
+    struct hostent *h;
+
+    h = gethostbyname (hev_fsh_config_get_server_domain (config));
+    if (!h)
+        return -1;
+
+    if (!inet_ntop (h->h_addrtype, h->h_addr, address, sizeof (address)))
+        return -1;
+
+    hev_fsh_config_set_server_address (config, address);
+
+    return 0;
+}
+
 int
 main (int argc, char *argv[])
 {
@@ -326,27 +345,31 @@ main (int argc, char *argv[])
 
         if (HEV_FSH_CONFIG_MODE_FORWARDER & mode) {
             for (;;) {
-                client = hev_fsh_client_forward_new (config);
+                if (resolve_domain (config) == 0) {
+                    client = hev_fsh_client_forward_new (config);
 
-                hev_task_system_run ();
+                    hev_task_system_run ();
 
-                hev_fsh_client_base_destroy (client);
+                    hev_fsh_client_base_destroy (client);
+                }
 
                 sleep (1);
             }
         } else if (HEV_FSH_CONFIG_MODE_CONNECTOR & mode) {
-            if (HEV_FSH_CONFIG_MODE_CONNECTOR_PORT == mode) {
-                if (hev_fsh_config_get_local_port (config))
-                    client = hev_fsh_client_port_listen_new (config);
-                else
-                    client = hev_fsh_client_port_connect_new (config, -1);
-            } else {
-                client = hev_fsh_client_term_connect_new (config);
+            if (resolve_domain (config) == 0) {
+                if (HEV_FSH_CONFIG_MODE_CONNECTOR_PORT == mode) {
+                    if (hev_fsh_config_get_local_port (config))
+                        client = hev_fsh_client_port_listen_new (config);
+                    else
+                        client = hev_fsh_client_port_connect_new (config, -1);
+                } else {
+                    client = hev_fsh_client_term_connect_new (config);
+                }
+
+                hev_task_system_run ();
+
+                hev_fsh_client_base_destroy (client);
             }
-
-            hev_task_system_run ();
-
-            hev_fsh_client_base_destroy (client);
         }
     }
 
