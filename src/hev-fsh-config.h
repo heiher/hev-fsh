@@ -32,6 +32,9 @@ void hev_fsh_config_destroy (HevFshConfig *self);
 int hev_fsh_config_get_mode (HevFshConfig *self);
 void hev_fsh_config_set_mode (HevFshConfig *self, int val);
 
+const char *hev_fsh_config_get_server_domain (HevFshConfig *self);
+void hev_fsh_config_set_server_domain (HevFshConfig *self, const char *val);
+
 const char *hev_fsh_config_get_server_address (HevFshConfig *self);
 void hev_fsh_config_set_server_address (HevFshConfig *self, const char *val);
 
