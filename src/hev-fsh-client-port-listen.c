@@ -2,7 +2,7 @@
  ============================================================================
  Name        : hev-fsh-client-port-listen.c
  Author      : Heiher <r@hev.cc>
- Copyright   : Copyright (c) 2018 everyone.
+ Copyright   : Copyright (c) 2018 - 2019 everyone.
  Description : Fsh client port connect
  ============================================================================
  */
@@ -14,12 +14,13 @@
 #include <sys/types.h>
 #include <netinet/in.h>
 
-#include "hev-fsh-client-port-listen.h"
-#include "hev-fsh-client-port-connect.h"
-#include "hev-memory-allocator.h"
 #include "hev-task.h"
 #include "hev-task-io.h"
 #include "hev-task-io-socket.h"
+#include "hev-memory-allocator.h"
+#include "hev-fsh-client-port-connect.h"
+
+#include "hev-fsh-client-port-listen.h"
 
 #define TASK_STACK_SIZE (8192)
 
@@ -45,7 +46,7 @@ hev_fsh_client_port_listen_new (HevFshConfig *config)
     self = hev_malloc0 (sizeof (HevFshClientPortListen));
     if (!self) {
         fprintf (stderr, "Allocate client port connect failed!\n");
-        return NULL;
+        goto exit;
     }
 
     address = hev_fsh_config_get_local_address (config);
@@ -53,35 +54,30 @@ hev_fsh_client_port_listen_new (HevFshConfig *config)
 
     if (0 > hev_fsh_client_base_construct (&self->base, address, port)) {
         fprintf (stderr, "Construct client base failed!\n");
-        hev_free (self);
-        return NULL;
+        goto exit_free;
     }
 
     if (0 > setsockopt (self->base.fd, SOL_SOCKET, SO_REUSEADDR, &reuseaddr,
                         sizeof (reuseaddr))) {
         fprintf (stderr, "Set reuse address failed!\n");
-        hev_free (self);
-        return NULL;
+        goto exit_free_base;
     }
 
     if (0 > bind (self->base.fd, &self->base.address,
                   sizeof (struct sockaddr_in))) {
         fprintf (stderr, "Bind client address failed!\n");
-        hev_free (self);
-        return NULL;
+        goto exit_free_base;
     }
 
     if (0 > listen (self->base.fd, 5)) {
         fprintf (stderr, "Listen client socket failed!\n");
-        hev_free (self);
-        return NULL;
+        goto exit_free_base;
     }
 
     self->task = hev_task_new (TASK_STACK_SIZE);
     if (!self->task) {
         fprintf (stderr, "Create client port's task failed!\n");
-        hev_free (self);
-        return NULL;
+        goto exit_free_base;
     }
 
     self->config = config;
@@ -90,6 +86,13 @@ hev_fsh_client_port_listen_new (HevFshConfig *config)
     hev_task_run (self->task, hev_fsh_client_port_listen_task_entry, self);
 
     return &self->base;
+
+exit_free_base:
+    hev_fsh_client_base_destroy (&self->base);
+exit_free:
+    hev_free (self);
+exit:
+    return NULL;
 }
 
 static void
