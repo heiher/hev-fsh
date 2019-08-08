@@ -2,7 +2,7 @@
  ============================================================================
  Name        : hev-fsh-client-connect.c
  Author      : Heiher <r@hev.cc>
- Copyright   : Copyright (c) 2018 everyone.
+ Copyright   : Copyright (c) 2018 - 2019 everyone.
  Description : Fsh client connect
  ============================================================================
  */
@@ -13,11 +13,13 @@
 #include <sys/types.h>
 #include <netinet/in.h>
 
-#include "hev-fsh-client-connect.h"
-#include "hev-fsh-protocol.h"
-#include "hev-memory-allocator.h"
+#include "hev-task.h"
 #include "hev-task-io.h"
 #include "hev-task-io-socket.h"
+#include "hev-memory-allocator.h"
+#include "hev-fsh-protocol.h"
+
+#include "hev-fsh-client-connect.h"
 
 #define TASK_STACK_SIZE (8192)
 #define fsh_task_io_yielder hev_fsh_client_base_task_io_yielder
@@ -36,19 +38,24 @@ hev_fsh_client_connect_construct (HevFshClientConnect *self,
 
     if (0 > hev_fsh_client_base_construct (&self->base, address, port)) {
         fprintf (stderr, "Construct client base failed!\n");
-        return -1;
+        goto exit;
     }
 
     self->task = hev_task_new (TASK_STACK_SIZE);
     if (!self->task) {
         fprintf (stderr, "Create client connect's task failed!\n");
-        return -1;
+        goto exit_free;
     }
 
     self->config = config;
     self->base._destroy = hev_fsh_client_connect_destroy;
 
     return 0;
+
+exit_free:
+    hev_fsh_client_base_destroy (&self->base);
+exit:
+    return -1;
 }
 
 static void
