@@ -2,7 +2,7 @@
  ============================================================================
  Name        : hev-fsh-client-forward.c
  Author      : Heiher <r@hev.cc>
- Copyright   : Copyright (c) 2018 everyone.
+ Copyright   : Copyright (c) 2018 - 2019 everyone.
  Description : Fsh client forward
  ============================================================================
  */
@@ -14,14 +14,15 @@
 #include <sys/types.h>
 #include <netinet/in.h>
 
-#include "hev-fsh-client-forward.h"
-#include "hev-fsh-client-term-accept.h"
-#include "hev-fsh-client-port-accept.h"
-#include "hev-fsh-protocol.h"
-#include "hev-memory-allocator.h"
 #include "hev-task.h"
 #include "hev-task-io.h"
 #include "hev-task-io-socket.h"
+#include "hev-memory-allocator.h"
+#include "hev-fsh-protocol.h"
+#include "hev-fsh-client-term-accept.h"
+#include "hev-fsh-client-port-accept.h"
+
+#include "hev-fsh-client-forward.h"
 
 #define TASK_STACK_SIZE (8192)
 #define fsh_task_io_yielder hev_fsh_client_base_task_io_yielder
@@ -49,7 +50,7 @@ hev_fsh_client_forward_new (HevFshConfig *config)
     self = hev_malloc0 (sizeof (HevFshClientForward));
     if (!self) {
         fprintf (stderr, "Allocate client forward failed!\n");
-        return NULL;
+        goto exit;
     }
 
     address = hev_fsh_config_get_server_address (config);
@@ -57,15 +58,13 @@ hev_fsh_client_forward_new (HevFshConfig *config)
 
     if (0 > hev_fsh_client_base_construct (&self->base, address, port)) {
         fprintf (stderr, "Construct client base failed!\n");
-        hev_free (self);
-        return NULL;
+        goto exit_free;
     }
 
     self->task = hev_task_new (TASK_STACK_SIZE);
     if (!self->task) {
         fprintf (stderr, "Create client forward's task failed!\n");
-        hev_free (self);
-        return NULL;
+        goto exit_free_base;
     }
 
     self->config = config;
@@ -74,6 +73,13 @@ hev_fsh_client_forward_new (HevFshConfig *config)
     hev_task_run (self->task, hev_fsh_client_forward_task_entry, self);
 
     return &self->base;
+
+exit_free_base:
+    hev_fsh_client_base_destroy (&self->base);
+exit_free:
+    hev_free (self);
+exit:
+    return NULL;
 }
 
 static void
