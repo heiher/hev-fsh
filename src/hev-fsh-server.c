@@ -2,7 +2,7 @@
  ============================================================================
  Name        : hev-fsh-server.c
  Author      : Heiher <r@hev.cc>
- Copyright   : Copyright (c) 2017 everyone.
+ Copyright   : Copyright (c) 2017 - 2019 everyone.
  Description : Fsh server
  ============================================================================
  */
@@ -15,13 +15,14 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 
-#include "hev-fsh-server.h"
-#include "hev-fsh-server-session.h"
-#include "hev-memory-allocator.h"
 #include "hev-task.h"
 #include "hev-task-io.h"
 #include "hev-task-io-pipe.h"
 #include "hev-task-io-socket.h"
+#include "hev-memory-allocator.h"
+#include "hev-fsh-server-session.h"
+
+#include "hev-fsh-server.h"
 
 #define TIMEOUT (30 * 1000)
 
@@ -59,15 +60,14 @@ hev_fsh_server_new (HevFshConfig *config)
     fd = hev_task_io_socket_socket (AF_INET, SOCK_STREAM, 0);
     if (fd == -1) {
         fprintf (stderr, "Create socket failed!\n");
-        return NULL;
+        goto exit;
     }
 
     ret = setsockopt (fd, SOL_SOCKET, SO_REUSEADDR, &reuseaddr,
                       sizeof (reuseaddr));
     if (ret == -1) {
         fprintf (stderr, "Set reuse address failed!\n");
-        close (fd);
-        return NULL;
+        goto exit_close;
     }
 
     address = hev_fsh_config_get_server_address (config);
@@ -80,20 +80,18 @@ hev_fsh_server_new (HevFshConfig *config)
     ret = bind (fd, (struct sockaddr *)&addr, (socklen_t)sizeof (addr));
     if (ret == -1) {
         fprintf (stderr, "Bind address failed!\n");
-        close (fd);
-        return NULL;
+        goto exit_close;
     }
     ret = listen (fd, 100);
     if (ret == -1) {
         fprintf (stderr, "Listen failed!\n");
-        close (fd);
-        return NULL;
+        goto exit_close;
     }
 
     self = hev_malloc0 (sizeof (HevFshServer));
     if (!self) {
         fprintf (stderr, "Allocate server failed!\n");
-        return NULL;
+        goto exit_close;
     }
 
     self->fd = fd;
@@ -103,28 +101,33 @@ hev_fsh_server_new (HevFshConfig *config)
     self->task_worker = hev_task_new (8192);
     if (!self->task_worker) {
         fprintf (stderr, "Create server's task failed!\n");
-        hev_free (self);
-        return NULL;
+        goto exit_free;
     }
 
     self->task_event = hev_task_new (8192);
     if (!self->task_event) {
         fprintf (stderr, "Create event's task failed!\n");
-        hev_task_unref (self->task_worker);
-        hev_free (self);
-        return NULL;
+        goto exit_free_task_worker;
     }
 
     self->task_session_manager = hev_task_new (8192);
     if (!self->task_session_manager) {
         fprintf (stderr, "Create session manager's task failed!\n");
-        hev_task_unref (self->task_event);
-        hev_task_unref (self->task_worker);
-        hev_free (self);
-        return NULL;
+        goto exit_free_task_event;
     }
 
     return self;
+
+exit_free_task_event:
+    hev_task_unref (self->task_event);
+exit_free_task_worker:
+    hev_task_unref (self->task_worker);
+exit_free:
+    hev_free (self);
+exit_close:
+    close (fd);
+exit:
+    return NULL;
 }
 
 void
