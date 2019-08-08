@@ -2,7 +2,7 @@
  ============================================================================
  Name        : hev-fsh-server-session.h
  Author      : Heiher <r@hev.cc>
- Copyright   : Copyright (c) 2017 everyone.
+ Copyright   : Copyright (c) 2017 - 2019 everyone.
  Description : Fsh server session
  ============================================================================
  */

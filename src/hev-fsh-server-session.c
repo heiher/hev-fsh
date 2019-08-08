@@ -2,7 +2,7 @@
  ============================================================================
  Name        : hev-fsh-server-session.c
  Author      : Heiher <r@hev.cc>
- Copyright   : Copyright (c) 2017 - 2018 everyone.
+ Copyright   : Copyright (c) 2017 - 2019 everyone.
  Description : Fsh server session
  ============================================================================
  */
@@ -14,12 +14,13 @@
 #include <arpa/inet.h>
 #include <time.h>
 
-#include "hev-fsh-server-session.h"
-#include "hev-fsh-protocol.h"
-#include "hev-memory-allocator.h"
 #include "hev-task.h"
 #include "hev-task-io.h"
 #include "hev-task-io-socket.h"
+#include "hev-memory-allocator.h"
+#include "hev-fsh-protocol.h"
+
+#include "hev-fsh-server-session.h"
 
 #define SESSION_HP (10)
 #define TASK_STACK_SIZE (8192)
@@ -77,7 +78,7 @@ hev_fsh_server_session_new (int client_fd,
 
     self = hev_malloc0 (sizeof (HevFshServerSession));
     if (!self)
-        return NULL;
+        goto exit;
 
     self->base.hp = SESSION_HP;
 
@@ -88,15 +89,18 @@ hev_fsh_server_session_new (int client_fd,
     self->notify_data = notify_data;
 
     task = hev_task_new (TASK_STACK_SIZE);
-    if (!task) {
-        hev_free (self);
-        return NULL;
-    }
+    if (!task)
+        goto exit_free;
 
     self->base.task = task;
     hev_task_set_priority (task, 9);
 
     return self;
+
+exit_free:
+    hev_free (self);
+exit:
+    return NULL;
 }
 
 HevFshServerSession *
