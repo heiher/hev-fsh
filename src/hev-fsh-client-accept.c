@@ -2,7 +2,7 @@
  ============================================================================
  Name        : hev-fsh-client-accept.c
  Author      : Heiher <r@hev.cc>
- Copyright   : Copyright (c) 2018 everyone.
+ Copyright   : Copyright (c) 2018 - 2019 everyone.
  Description : Fsh client accept
  ============================================================================
  */
@@ -12,9 +12,11 @@
 #include <sys/types.h>
 #include <netinet/in.h>
 
-#include "hev-fsh-client-accept.h"
+#include "hev-task.h"
 #include "hev-task-io.h"
 #include "hev-task-io-socket.h"
+
+#include "hev-fsh-client-accept.h"
 
 #define TASK_STACK_SIZE (16384)
 #define fsh_task_io_yielder hev_fsh_client_base_task_io_yielder
@@ -33,13 +35,13 @@ hev_fsh_client_accept_construct (HevFshClientAccept *self, HevFshConfig *config,
 
     if (0 > hev_fsh_client_base_construct (&self->base, address, port)) {
         fprintf (stderr, "Construct client base failed!\n");
-        return -1;
+        goto exit;
     }
 
     self->task = hev_task_new (TASK_STACK_SIZE);
     if (!self->task) {
         fprintf (stderr, "Create client accept's task failed!\n");
-        return -1;
+        goto exit_free;
     }
 
     self->config = config;
@@ -47,6 +49,11 @@ hev_fsh_client_accept_construct (HevFshClientAccept *self, HevFshConfig *config,
     self->base._destroy = hev_fsh_client_accept_destroy;
 
     return 0;
+
+exit_free:
+    hev_fsh_client_base_destroy (&self->base);
+exit:
+    return -1;
 }
 
 static void
