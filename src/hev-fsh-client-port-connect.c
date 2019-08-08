@@ -2,7 +2,7 @@
  ============================================================================
  Name        : hev-fsh-client-port-connect.c
  Author      : Heiher <r@hev.cc>
- Copyright   : Copyright (c) 2018 everyone.
+ Copyright   : Copyright (c) 2018 - 2019 everyone.
  Description : Fsh client port connect
  ============================================================================
  */
@@ -15,11 +15,13 @@
 #include <arpa/inet.h>
 #include <netinet/in.h>
 
-#include "hev-fsh-client-port-connect.h"
-#include "hev-fsh-protocol.h"
-#include "hev-memory-allocator.h"
+#include "hev-task.h"
 #include "hev-task-io.h"
 #include "hev-task-io-socket.h"
+#include "hev-memory-allocator.h"
+#include "hev-fsh-protocol.h"
+
+#include "hev-fsh-client-port-connect.h"
 
 #define fsh_task_io_yielder hev_fsh_client_base_task_io_yielder
 
@@ -41,13 +43,12 @@ hev_fsh_client_port_connect_new (HevFshConfig *config, int local_fd)
     self = hev_malloc0 (sizeof (HevFshClientPortConnect));
     if (!self) {
         fprintf (stderr, "Allocate client port connect failed!\n");
-        return NULL;
+        goto exit;
     }
 
     if (0 > hev_fsh_client_connect_construct (&self->base, config)) {
         fprintf (stderr, "Construct client connect failed!\n");
-        hev_free (self);
-        return NULL;
+        goto exit_free;
     }
 
     self->local_fd = local_fd;
@@ -57,6 +58,11 @@ hev_fsh_client_port_connect_new (HevFshConfig *config, int local_fd)
                   self);
 
     return &self->base.base;
+
+exit_free:
+    hev_free (self);
+exit:
+    return NULL;
 }
 
 static void
