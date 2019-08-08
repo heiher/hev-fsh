@@ -2,7 +2,7 @@
  ============================================================================
  Name        : hev-fsh-client-term-connect.c
  Author      : Heiher <r@hev.cc>
- Copyright   : Copyright (c) 2018 everyone.
+ Copyright   : Copyright (c) 2018 - 2019 everyone.
  Description : Fsh client term connect
  ============================================================================
  */
@@ -15,11 +15,13 @@
 #include <sys/ioctl.h>
 #include <termios.h>
 
-#include "hev-fsh-client-term-connect.h"
-#include "hev-fsh-protocol.h"
-#include "hev-memory-allocator.h"
+#include "hev-task.h"
 #include "hev-task-io.h"
 #include "hev-task-io-socket.h"
+#include "hev-memory-allocator.h"
+#include "hev-fsh-protocol.h"
+
+#include "hev-fsh-client-term-connect.h"
 
 #define fsh_task_io_yielder hev_fsh_client_base_task_io_yielder
 
@@ -39,13 +41,12 @@ hev_fsh_client_term_connect_new (HevFshConfig *config)
     self = hev_malloc0 (sizeof (HevFshClientTermConnect));
     if (!self) {
         fprintf (stderr, "Allocate client term connect failed!\n");
-        return NULL;
+        goto exit;
     }
 
     if (0 > hev_fsh_client_connect_construct (&self->base, config)) {
         fprintf (stderr, "Construct client connect failed!\n");
-        hev_free (self);
-        return NULL;
+        goto exit_free;
     }
 
     self->base._destroy = hev_fsh_client_term_connect_destroy;
@@ -54,6 +55,11 @@ hev_fsh_client_term_connect_new (HevFshConfig *config)
                   self);
 
     return &self->base.base;
+
+exit_free:
+    hev_free (self);
+exit:
+    return NULL;
 }
 
 static void
