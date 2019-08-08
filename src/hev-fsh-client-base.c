@@ -2,7 +2,7 @@
  ============================================================================
  Name        : hev-fsh-client-base.c
  Author      : Heiher <r@hev.cc>
- Copyright   : Copyright (c) 2018 everyone.
+ Copyright   : Copyright (c) 2018 - 2019 everyone.
  Description : Fsh client base
  ============================================================================
  */
@@ -15,10 +15,11 @@
 #include <arpa/inet.h>
 #include <netinet/in.h>
 
-#include "hev-fsh-client-base.h"
 #include "hev-task.h"
 #include "hev-task-io.h"
 #include "hev-task-io-socket.h"
+
+#include "hev-fsh-client-base.h"
 
 #define TIMEOUT (30 * 1000)
 
@@ -29,21 +30,22 @@ hev_fsh_client_base_socket (void)
 
     fd = hev_task_io_socket_socket (AF_INET, SOCK_STREAM, 0);
     if (fd == -1)
-        return -1;
+        goto exit;
 
     flags = fcntl (fd, F_GETFD);
-    if (flags == -1) {
-        close (fd);
-        return -1;
-    }
+    if (flags == -1)
+        goto exit_close;
 
     flags |= FD_CLOEXEC;
-    if (fcntl (fd, F_SETFD, flags) == -1) {
-        close (fd);
-        return -1;
-    }
+    if (fcntl (fd, F_SETFD, flags) == -1)
+        goto exit_close;
 
     return fd;
+
+exit_close:
+    close (fd);
+exit:
+    return -1;
 }
 
 int
