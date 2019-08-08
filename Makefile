@@ -6,7 +6,7 @@ CROSS_PREFIX :=
 PP=$(CROSS_PREFIX)cpp
 CC=$(CROSS_PREFIX)gcc
 STRIP=$(CROSS_PREFIX)strip
-CCFLAGS=-O3 -pipe -Wall -Werror \
+CCFLAGS=-O3 -pipe -Wall -Werror $(CFLAGS) \
 		-I$(THIRDPARTDIR)/hev-task-system/include \
 		`pkg-config --cflags uuid`
 LDFLAGS=-L$(THIRDPARTDIR)/hev-task-system/bin -lhev-task-system \
