@@ -173,15 +173,13 @@ hev_fsh_client_forward_task_entry (void *data)
                                            NULL);
             if (len <= 0)
                 return;
-            len = hev_task_io_socket_recv (sock_fd, &message, sizeof (message),
-                                           MSG_WAITALL, fsh_task_io_yielder,
-                                           NULL);
-            if ((len <= 0) || (HEV_FSH_CMD_KEEP_ALIVE != message.cmd))
-                return;
             continue;
         } else if (len <= 0) {
             return;
         }
+
+        if (HEV_FSH_CMD_KEEP_ALIVE == message.cmd)
+            continue;
 
         len = hev_task_io_socket_recv (sock_fd, &msg_token, sizeof (msg_token),
                                        MSG_WAITALL, fsh_task_io_yielder, NULL);
