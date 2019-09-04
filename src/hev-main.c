@@ -43,7 +43,7 @@ show_help (void)
              "  Connector: SERVER_ADDR[:SERVER_PORT]/TOKEN\n"
              "TCP Port:\n"
              "  Forwarder: -f -p [-w ADDR:PORT,... | -b ADDR:PORT,...] "
-             "SERVER_ADDR[:SERVER_PORT/TOKEN\n"
+             "SERVER_ADDR[:SERVER_PORT/TOKEN]\n"
              "  Connector: -p [LOCAL_ADDR:]LOCAL_PORT:REMOTE_ADD:REMOTE_PORT "
              "SERVER_ADDR[:SERVER_PORT]/TOKEN\n"
              "             -p REMOTE_ADD:REMOTE_PORT "
