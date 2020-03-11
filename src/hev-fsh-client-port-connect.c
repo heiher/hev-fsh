@@ -98,7 +98,7 @@ hev_fsh_client_port_connect_task_entry (void *data)
     /* send message port info */
     len = hev_task_io_socket_send (self->base.base.fd, &message_port_info,
                                    sizeof (message_port_info), MSG_WAITALL,
-                                   fsh_task_io_yielder, NULL);
+                                   fsh_task_io_yielder, self);
     if (len <= 0)
         return;
 
@@ -124,5 +124,5 @@ hev_fsh_client_port_connect_task_entry (void *data)
     }
 
     hev_task_io_splice (self->base.base.fd, self->base.base.fd, ifd, ofd, 8192,
-                        fsh_task_io_yielder, NULL);
+                        fsh_task_io_yielder, self);
 }
