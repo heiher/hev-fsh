@@ -44,8 +44,9 @@ HevFshClientBase *
 hev_fsh_client_forward_new (HevFshConfig *config)
 {
     HevFshClientForward *self;
-    const char *address;
+    const char *addr;
     unsigned int port;
+    unsigned int timeout;
 
     self = hev_malloc0 (sizeof (HevFshClientForward));
     if (!self) {
@@ -53,10 +54,11 @@ hev_fsh_client_forward_new (HevFshConfig *config)
         goto exit;
     }
 
-    address = hev_fsh_config_get_server_address (config);
+    addr = hev_fsh_config_get_server_address (config);
     port = hev_fsh_config_get_server_port (config);
+    timeout = hev_fsh_config_get_timeout (config);
 
-    if (0 > hev_fsh_client_base_construct (&self->base, address, port)) {
+    if (0 > hev_fsh_client_base_construct (&self->base, addr, port, timeout)) {
         fprintf (stderr, "Construct client base failed!\n");
         goto exit_free;
     }
@@ -105,7 +107,7 @@ hev_fsh_client_forward_task_entry (void *data)
 
     if (hev_task_io_socket_connect (sock_fd, &self->base.address,
                                     sizeof (struct sockaddr_in),
-                                    fsh_task_io_yielder, NULL) < 0) {
+                                    fsh_task_io_yielder, self) < 0) {
         fprintf (stderr, "Connect to server failed!\n");
         return;
     }
@@ -116,7 +118,7 @@ hev_fsh_client_forward_task_entry (void *data)
     message.cmd = HEV_FSH_CMD_LOGIN;
 
     len = hev_task_io_socket_send (sock_fd, &message, sizeof (message),
-                                   MSG_WAITALL, fsh_task_io_yielder, NULL);
+                                   MSG_WAITALL, fsh_task_io_yielder, self);
     if (len <= 0)
         return;
 
@@ -128,14 +130,14 @@ hev_fsh_client_forward_task_entry (void *data)
 
         memcpy (msg_token.token, self->token, sizeof (HevFshToken));
         len = hev_task_io_socket_send (sock_fd, &msg_token, sizeof (msg_token),
-                                       MSG_WAITALL, fsh_task_io_yielder, NULL);
+                                       MSG_WAITALL, fsh_task_io_yielder, self);
         if (len <= 0)
             return;
     }
 
     /* recv message token */
     len = hev_task_io_socket_recv (sock_fd, &message, sizeof (message),
-                                   MSG_WAITALL, fsh_task_io_yielder, NULL);
+                                   MSG_WAITALL, fsh_task_io_yielder, self);
     if (len <= 0)
         return;
 
@@ -145,7 +147,7 @@ hev_fsh_client_forward_task_entry (void *data)
     }
 
     len = hev_task_io_socket_recv (sock_fd, &msg_token, sizeof (msg_token),
-                                   MSG_WAITALL, fsh_task_io_yielder, NULL);
+                                   MSG_WAITALL, fsh_task_io_yielder, self);
     if (len <= 0)
         return;
 
@@ -163,14 +165,14 @@ hev_fsh_client_forward_task_entry (void *data)
     for (;;) {
         /* recv message connect */
         len = hev_task_io_socket_recv (sock_fd, &message, sizeof (message),
-                                       MSG_WAITALL, fsh_task_io_yielder, NULL);
+                                       MSG_WAITALL, fsh_task_io_yielder, self);
         if (len == -2) {
             /* keep alive */
             message.ver = 2;
             message.cmd = HEV_FSH_CMD_KEEP_ALIVE;
             len = hev_task_io_socket_send (sock_fd, &message, sizeof (message),
                                            MSG_WAITALL, fsh_task_io_yielder,
-                                           NULL);
+                                           self);
             if (len <= 0)
                 return;
             continue;
@@ -182,7 +184,7 @@ hev_fsh_client_forward_task_entry (void *data)
             continue;
 
         len = hev_task_io_socket_recv (sock_fd, &msg_token, sizeof (msg_token),
-                                       MSG_WAITALL, fsh_task_io_yielder, NULL);
+                                       MSG_WAITALL, fsh_task_io_yielder, self);
         if (len <= 0)
             return;
 
