@@ -91,7 +91,7 @@ hev_fsh_client_term_accept_task_entry (void *data)
     /* recv message term info */
     len = hev_task_io_socket_recv (sfd, &message_term_info,
                                    sizeof (message_term_info), MSG_WAITALL,
-                                   fsh_task_io_yielder, NULL);
+                                   fsh_task_io_yielder, self);
     if (len <= 0)
         goto quit;
 
@@ -148,7 +148,7 @@ hev_fsh_client_term_accept_task_entry (void *data)
 
     hev_task_add_fd (task, pfd, POLLIN | POLLOUT);
 
-    hev_task_io_splice (sfd, sfd, pfd, pfd, 8192, fsh_task_io_yielder, NULL);
+    hev_task_io_splice (sfd, sfd, pfd, pfd, 8192, fsh_task_io_yielder, self);
 
 quit_close_fd:
     close (pfd);
