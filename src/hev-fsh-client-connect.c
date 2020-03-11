@@ -30,13 +30,15 @@ int
 hev_fsh_client_connect_construct (HevFshClientConnect *self,
                                   HevFshConfig *config)
 {
-    const char *address;
+    const char *addr;
     unsigned int port;
+    unsigned int timeout;
 
-    address = hev_fsh_config_get_server_address (config);
+    addr = hev_fsh_config_get_server_address (config);
     port = hev_fsh_config_get_server_port (config);
+    timeout = hev_fsh_config_get_timeout (config);
 
-    if (0 > hev_fsh_client_base_construct (&self->base, address, port)) {
+    if (0 > hev_fsh_client_base_construct (&self->base, addr, port, timeout)) {
         fprintf (stderr, "Construct client base failed!\n");
         goto exit;
     }
@@ -80,7 +82,7 @@ hev_fsh_client_connect_send_connect (HevFshClientConnect *self)
 
     if (hev_task_io_socket_connect (self->base.fd, &self->base.address,
                                     sizeof (struct sockaddr_in),
-                                    fsh_task_io_yielder, NULL) < 0) {
+                                    fsh_task_io_yielder, self) < 0) {
         fprintf (stderr, "Connect to server failed!\n");
         return -1;
     }
@@ -88,7 +90,7 @@ hev_fsh_client_connect_send_connect (HevFshClientConnect *self)
     message.ver = 1;
     message.cmd = HEV_FSH_CMD_CONNECT;
     len = hev_task_io_socket_send (self->base.fd, &message, sizeof (message),
-                                   MSG_WAITALL, fsh_task_io_yielder, NULL);
+                                   MSG_WAITALL, fsh_task_io_yielder, self);
     if (len <= 0)
         return -1;
 
@@ -101,7 +103,7 @@ hev_fsh_client_connect_send_connect (HevFshClientConnect *self)
     /* send message token */
     len = hev_task_io_socket_send (self->base.fd, &message_token,
                                    sizeof (message_token), MSG_WAITALL,
-                                   fsh_task_io_yielder, NULL);
+                                   fsh_task_io_yielder, self);
     if (len <= 0)
         return -1;
 
