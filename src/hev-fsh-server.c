@@ -24,13 +24,12 @@
 
 #include "hev-fsh-server.h"
 
-#define TIMEOUT (30 * 1000)
-
 struct _HevFshServer
 {
     int fd;
-    int event_fds[2];
     int quit;
+    int event_fds[2];
+    unsigned int timeout;
 
     HevTask *task_worker;
     HevTask *task_event;
@@ -97,6 +96,7 @@ hev_fsh_server_new (HevFshConfig *config)
     self->fd = fd;
     self->event_fds[0] = -1;
     self->event_fds[1] = -1;
+    self->timeout = hev_fsh_config_get_timeout (config);
 
     self->task_worker = hev_task_new (8192);
     if (!self->task_worker) {
@@ -261,7 +261,7 @@ hev_fsh_server_session_manager_task_entry (void *data)
     for (;;) {
         HevFshServerSessionBase *session;
 
-        hev_task_sleep (TIMEOUT);
+        hev_task_sleep (self->timeout * 1000);
         if (self->quit)
             break;
 
