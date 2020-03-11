@@ -81,7 +81,7 @@ hev_fsh_client_port_accept_task_entry (void *data)
     /* recv message port info */
     if (hev_task_io_socket_recv (rfd, &message_port_info,
                                  sizeof (message_port_info), MSG_WAITALL,
-                                 fsh_task_io_yielder, NULL) <= 0)
+                                 fsh_task_io_yielder, self) <= 0)
         goto quit;
 
     if (!hev_fsh_config_addr_list_contains (
@@ -107,10 +107,10 @@ hev_fsh_client_port_accept_task_entry (void *data)
 
     if (hev_task_io_socket_connect (lfd, (struct sockaddr *)&addr,
                                     sizeof (addr), fsh_task_io_yielder,
-                                    NULL) < 0)
+                                    self) < 0)
         goto quit_close_fd;
 
-    hev_task_io_splice (rfd, rfd, lfd, lfd, 8192, fsh_task_io_yielder, NULL);
+    hev_task_io_splice (rfd, rfd, lfd, lfd, 8192, fsh_task_io_yielder, self);
 
 quit_close_fd:
     close (lfd);

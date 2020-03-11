@@ -39,8 +39,9 @@ HevFshClientBase *
 hev_fsh_client_port_listen_new (HevFshConfig *config)
 {
     HevFshClientPortListen *self;
-    const char *address;
+    const char *addr;
     unsigned int port;
+    unsigned int timeout;
     int reuseaddr = 1;
 
     self = hev_malloc0 (sizeof (HevFshClientPortListen));
@@ -49,10 +50,11 @@ hev_fsh_client_port_listen_new (HevFshConfig *config)
         goto exit;
     }
 
-    address = hev_fsh_config_get_local_address (config);
+    addr = hev_fsh_config_get_local_address (config);
     port = hev_fsh_config_get_local_port (config);
+    timeout = hev_fsh_config_get_timeout (config);
 
-    if (0 > hev_fsh_client_base_construct (&self->base, address, port)) {
+    if (0 > hev_fsh_client_base_construct (&self->base, addr, port, timeout)) {
         fprintf (stderr, "Construct client base failed!\n");
         goto exit_free;
     }
