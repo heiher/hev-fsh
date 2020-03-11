@@ -21,8 +21,6 @@
 
 #include "hev-fsh-client-base.h"
 
-#define TIMEOUT (30 * 1000)
-
 static int
 hev_fsh_client_base_socket (void)
 {
@@ -50,7 +48,7 @@ exit:
 
 int
 hev_fsh_client_base_construct (HevFshClientBase *self, const char *address,
-                               unsigned int port)
+                               unsigned int port, unsigned int timeout)
 {
     struct sockaddr_in *addr;
 
@@ -65,6 +63,7 @@ hev_fsh_client_base_construct (HevFshClientBase *self, const char *address,
     addr->sin_addr.s_addr = inet_addr (address);
     addr->sin_port = htons (port);
 
+    self->timeout = timeout;
     signal (SIGCHLD, SIG_IGN);
 
     return 0;
@@ -81,8 +80,10 @@ hev_fsh_client_base_destroy (HevFshClientBase *self)
 int
 hev_fsh_client_base_task_io_yielder (HevTaskYieldType type, void *data)
 {
+    HevFshClientBase *self = data;
+
     if (type == HEV_TASK_WAITIO) {
-        if (0 == hev_task_sleep (TIMEOUT))
+        if (0 == hev_task_sleep (self->timeout * 1000))
             return -1;
     } else {
         hev_task_yield (HEV_TASK_YIELD);

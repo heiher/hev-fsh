@@ -21,6 +21,7 @@ typedef void (*HevFshClientBaseDestroy) (HevFshClientBase *self);
 struct _HevFshClientBase
 {
     int fd;
+    unsigned int timeout;
     struct sockaddr address;
 
     /* private */
@@ -28,7 +29,7 @@ struct _HevFshClientBase
 };
 
 int hev_fsh_client_base_construct (HevFshClientBase *self, const char *address,
-                                   unsigned int port);
+                                   unsigned int port, unsigned int timeout);
 
 void hev_fsh_client_base_destroy (HevFshClientBase *self);
 
