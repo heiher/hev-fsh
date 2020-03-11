@@ -27,13 +27,15 @@ int
 hev_fsh_client_accept_construct (HevFshClientAccept *self, HevFshConfig *config,
                                  HevFshToken token)
 {
-    const char *address;
+    const char *addr;
     unsigned int port;
+    unsigned int timeout;
 
-    address = hev_fsh_config_get_server_address (config);
+    addr = hev_fsh_config_get_server_address (config);
     port = hev_fsh_config_get_server_port (config);
+    timeout = hev_fsh_config_get_timeout (config);
 
-    if (0 > hev_fsh_client_base_construct (&self->base, address, port)) {
+    if (0 > hev_fsh_client_base_construct (&self->base, addr, port, timeout)) {
         fprintf (stderr, "Construct client base failed!\n");
         goto exit;
     }
@@ -80,7 +82,7 @@ hev_fsh_client_accept_send_accept (HevFshClientAccept *self)
 
     if (hev_task_io_socket_connect (fd, &self->base.address,
                                     sizeof (struct sockaddr_in),
-                                    fsh_task_io_yielder, NULL) < 0)
+                                    fsh_task_io_yielder, self) < 0)
         return -1;
 
     message.ver = 1;
@@ -97,7 +99,7 @@ hev_fsh_client_accept_send_accept (HevFshClientAccept *self)
     iov[1].iov_len = sizeof (message_token);
 
     if (hev_task_io_socket_sendmsg (fd, &mh, MSG_WAITALL, fsh_task_io_yielder,
-                                    NULL) <= 0)
+                                    self) <= 0)
         return -1;
 
     return 0;
