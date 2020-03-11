@@ -22,6 +22,7 @@ struct _HevFshConfig
     const char *server_domain;
     const char *server_address;
     unsigned int server_port;
+    unsigned int timeout;
 
     const char *log;
     const char *user;
@@ -58,6 +59,7 @@ hev_fsh_config_new (void)
         return NULL;
     }
 
+    self->timeout = 300;
     self->server_port = 6339;
     self->local_address = "127.0.0.1";
 
@@ -162,6 +164,18 @@ void
 hev_fsh_config_set_log (HevFshConfig *self, const char *val)
 {
     self->log = val;
+}
+
+unsigned int
+hev_fsh_config_get_timeout (HevFshConfig *self)
+{
+    return self->timeout;
+}
+
+void
+hev_fsh_config_set_timeout (HevFshConfig *self, unsigned int val)
+{
+    self->timeout = val;
 }
 
 const char *

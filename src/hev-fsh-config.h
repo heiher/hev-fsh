@@ -47,6 +47,9 @@ void hev_fsh_config_set_token (HevFshConfig *self, const char *val);
 const char *hev_fsh_config_get_log (HevFshConfig *self);
 void hev_fsh_config_set_log (HevFshConfig *self, const char *val);
 
+unsigned int hev_fsh_config_get_timeout (HevFshConfig *self);
+void hev_fsh_config_set_timeout (HevFshConfig *self, unsigned int val);
+
 /* Forwarder terminal */
 const char *hev_fsh_config_get_user (HevFshConfig *self);
 void hev_fsh_config_set_user (HevFshConfig *self, const char *val);
