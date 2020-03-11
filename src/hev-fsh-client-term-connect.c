@@ -90,7 +90,7 @@ hev_fsh_client_term_connect_task_entry (void *data)
     /* send message term info */
     len = hev_task_io_socket_send (self->base.base.fd, &message_term_info,
                                    sizeof (message_term_info), MSG_WAITALL,
-                                   fsh_task_io_yielder, NULL);
+                                   fsh_task_io_yielder, self);
     if (len <= 0)
         return;
 
@@ -112,7 +112,7 @@ hev_fsh_client_term_connect_task_entry (void *data)
         return;
 
     hev_task_io_splice (self->base.base.fd, self->base.base.fd, 0, 1, 8192,
-                        fsh_task_io_yielder, NULL);
+                        fsh_task_io_yielder, self);
 
     tcsetattr (0, TCSADRAIN, &term);
 }
