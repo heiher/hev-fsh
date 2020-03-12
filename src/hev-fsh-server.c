@@ -42,10 +42,10 @@ static void hev_fsh_server_event_task_entry (void *data);
 static void hev_fsh_server_session_manager_task_entry (void *data);
 
 static void session_manager_insert_session (HevFshServer *self,
-                                            HevFshServerSession *session);
+                                            HevFshServerSession *s);
 static void session_manager_remove_session (HevFshServer *self,
-                                            HevFshServerSession *session);
-static void session_close_handler (HevFshServerSession *session, void *data);
+                                            HevFshServerSession *s);
+static void session_close_handler (HevFshServerSession *s, void *data);
 
 HevFshServer *
 hev_fsh_server_new (HevFshConfig *config)
@@ -181,7 +181,7 @@ hev_fsh_server_task_entry (void *data)
         struct sockaddr_in addr;
         struct sockaddr *in_addr = (struct sockaddr *)&addr;
         socklen_t addr_len = sizeof (addr);
-        HevFshServerSession *session;
+        HevFshServerSession *s;
 
         client_fd = hev_task_io_socket_accept (self->fd, in_addr, &addr_len,
                                                fsh_task_io_yielder, self);
@@ -197,15 +197,14 @@ hev_fsh_server_task_entry (void *data)
                 inet_ntoa (addr.sin_addr), ntohs (addr.sin_port));
 #endif
 
-        session =
-            hev_fsh_server_session_new (client_fd, session_close_handler, self);
-        if (!session) {
+        s = hev_fsh_server_session_new (client_fd, session_close_handler, self);
+        if (!s) {
             close (client_fd);
             continue;
         }
 
-        session_manager_insert_session (self, session);
-        hev_fsh_server_session_run (session);
+        session_manager_insert_session (self, s);
+        hev_fsh_server_session_run (s);
     }
 }
 
@@ -214,7 +213,7 @@ hev_fsh_server_event_task_entry (void *data)
 {
     HevFshServer *self = data;
     HevTask *task = hev_task_self ();
-    HevFshServerSessionBase *session;
+    HevFshServerSessionBase *s;
     int val;
 
     if (-1 == hev_task_io_pipe_pipe (self->event_fds)) {
@@ -236,16 +235,16 @@ hev_fsh_server_event_task_entry (void *data)
 #ifdef _DEBUG
     printf ("Enumerating session list ...\n");
 #endif
-    for (session = self->session_list; session; session = session->next) {
+    for (s = self->session_list; s; s = s->next) {
 #ifdef _DEBUG
-        printf ("Set session %p's hp = 0\n", session);
+        printf ("Set session %p's hp = 0\n", s);
 #endif
-        session->hp = 0;
+        s->hp = 0;
 
         /* wakeup session's task to do destroy */
-        hev_task_wakeup (session->task);
+        hev_task_wakeup (s->task);
 #ifdef _DEBUG
-        printf ("Wakeup session %p's task %p\n", session, session->task);
+        printf ("Wakeup session %p's task %p\n", s, s->task);
 #endif
     }
 
@@ -259,7 +258,7 @@ hev_fsh_server_session_manager_task_entry (void *data)
     HevFshServer *self = data;
 
     for (;;) {
-        HevFshServerSessionBase *session;
+        HevFshServerSessionBase *s;
 
         hev_task_sleep (self->timeout * 1000);
         if (self->quit)
@@ -268,31 +267,30 @@ hev_fsh_server_session_manager_task_entry (void *data)
 #ifdef _DEBUG
         printf ("Enumerating session list ...\n");
 #endif
-        for (session = self->session_list; session; session = session->next) {
+        for (s = self->session_list; s; s = s->next) {
 #ifdef _DEBUG
-            printf ("Session %p's hp %d\n", session, session->hp);
+            printf ("Session %p's hp %d\n", s, s->hp);
 #endif
-            session->hp--;
-            if (session->hp > 0)
+            s->hp--;
+            if (s->hp > 0)
                 continue;
 
             /* wakeup session's task to do destroy */
-            hev_task_wakeup (session->task);
+            hev_task_wakeup (s->task);
 #ifdef _DEBUG
-            printf ("Wakeup session %p's task %p\n", session, session->task);
+            printf ("Wakeup session %p's task %p\n", s, s->task);
 #endif
         }
     }
 }
 
 static void
-session_manager_insert_session (HevFshServer *self,
-                                HevFshServerSession *session)
+session_manager_insert_session (HevFshServer *self, HevFshServerSession *s)
 {
-    HevFshServerSessionBase *session_base = (HevFshServerSessionBase *)session;
+    HevFshServerSessionBase *session_base = (HevFshServerSessionBase *)s;
 
 #ifdef _DEBUG
-    printf ("Insert session: %p\n", session);
+    printf ("Insert session: %p\n", s);
 #endif
     /* insert session to session_list */
     session_base->prev = NULL;
@@ -303,13 +301,12 @@ session_manager_insert_session (HevFshServer *self,
 }
 
 static void
-session_manager_remove_session (HevFshServer *self,
-                                HevFshServerSession *session)
+session_manager_remove_session (HevFshServer *self, HevFshServerSession *s)
 {
-    HevFshServerSessionBase *session_base = (HevFshServerSessionBase *)session;
+    HevFshServerSessionBase *session_base = (HevFshServerSessionBase *)s;
 
 #ifdef _DEBUG
-    printf ("Remove session: %p\n", session);
+    printf ("Remove session: %p\n", s);
 #endif
     /* remove session from session_list */
     if (session_base->prev) {
@@ -323,9 +320,9 @@ session_manager_remove_session (HevFshServer *self,
 }
 
 static void
-session_close_handler (HevFshServerSession *session, void *data)
+session_close_handler (HevFshServerSession *s, void *data)
 {
     HevFshServer *self = data;
 
-    session_manager_remove_session (self, session);
+    session_manager_remove_session (self, s);
 }
