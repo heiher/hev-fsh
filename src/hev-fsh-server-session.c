@@ -232,7 +232,6 @@ fsh_server_do_login (HevFshServerSession *self)
         HevFshToken zero_token = { 0 };
         ssize_t len;
 
-        sleep_wait (1500);
         len = hev_task_io_socket_recv (self->client_fd, &msg_token,
                                        sizeof (msg_token), MSG_WAITALL,
                                        fsh_task_io_yielder, self);
@@ -295,7 +294,6 @@ fsh_server_do_connect (HevFshServerSession *self)
     HevFshMessageToken message_token;
     ssize_t len;
 
-    sleep_wait (1500);
     len = hev_task_io_socket_recv (self->client_fd, &message_token,
                                    sizeof (message_token), MSG_WAITALL,
                                    fsh_task_io_yielder, self);
@@ -322,8 +320,10 @@ fsh_server_write_message_connect (HevFshServerSession *self)
 
     session =
         fsh_server_find_session_by_token (self, TYPE_FORWARD, self->token);
-    if (!session)
+    if (!session) {
+        sleep_wait (1500);
         return STEP_CLOSE_SESSION;
+    }
 
     message.ver = self->msg_ver;
     message.cmd = HEV_FSH_CMD_CONNECT;
@@ -363,8 +363,10 @@ fsh_server_do_accept (HevFshServerSession *self)
 
     session = fsh_server_find_session_by_token (self, TYPE_CONNECT,
                                                 message_token.token);
-    if (!session)
+    if (!session) {
+        sleep_wait (1500);
         return STEP_CLOSE_SESSION;
+    }
 
     fs_session = (HevFshServerSession *)session;
     fs_session->remote_fd = self->client_fd;
