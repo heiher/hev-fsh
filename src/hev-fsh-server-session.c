@@ -22,10 +22,8 @@
 
 #include "hev-fsh-server-session.h"
 
-#define SESSION_HP (10)
 #define TASK_STACK_SIZE (8192)
-
-static void hev_fsh_server_session_task_entry (void *data);
+#define fsh_task_io_yielder hev_fsh_session_task_io_yielder
 
 enum
 {
@@ -54,23 +52,23 @@ enum
 
 struct _HevFshServerSession
 {
-    HevFshServerSessionBase base;
+    HevFshSession base;
 
     int client_fd;
     int remote_fd;
-    int ref_count;
 
     int type;
     int msg_ver;
     HevFshToken token;
 
-    HevFshServerSessionCloseNotify notify;
+    HevFshSessionNotify notify;
     void *notify_data;
 };
 
+static void hev_fsh_server_session_task_entry (void *data);
+
 HevFshServerSession *
-hev_fsh_server_session_new (int client_fd,
-                            HevFshServerSessionCloseNotify notify,
+hev_fsh_server_session_new (int client_fd, HevFshSessionNotify notify,
                             void *notify_data)
 {
     HevFshServerSession *self;
@@ -80,13 +78,11 @@ hev_fsh_server_session_new (int client_fd,
     if (!self)
         goto exit;
 
-    self->base.hp = SESSION_HP;
-
-    self->ref_count = 1;
     self->remote_fd = -1;
     self->client_fd = client_fd;
     self->notify = notify;
     self->notify_data = notify_data;
+    self->base.hp = HEV_FSH_SESSION_HP;
 
     task = hev_task_new (TASK_STACK_SIZE);
     if (!task)
@@ -103,21 +99,9 @@ exit:
     return NULL;
 }
 
-HevFshServerSession *
-hev_fsh_server_session_ref (HevFshServerSession *self)
+static inline void
+hev_fsh_server_session_destroy (HevFshServerSession *self)
 {
-    self->ref_count++;
-
-    return self;
-}
-
-void
-hev_fsh_server_session_unref (HevFshServerSession *self)
-{
-    self->ref_count--;
-    if (self->ref_count)
-        return;
-
     hev_free (self);
 }
 
@@ -127,39 +111,27 @@ hev_fsh_server_session_run (HevFshServerSession *self)
     hev_task_run (self->base.task, hev_fsh_server_session_task_entry, self);
 }
 
-static int
-fsh_task_io_yielder (HevTaskYieldType type, void *data)
-{
-    HevFshServerSession *self = data;
-
-    self->base.hp = SESSION_HP;
-
-    hev_task_yield (type);
-
-    return (self->base.hp > 0) ? 0 : -1;
-}
-
-static HevFshServerSessionBase *
+static HevFshSession *
 fsh_server_find_session_by_token (HevFshServerSession *self, int type,
                                   HevFshToken token)
 {
-    HevFshServerSessionBase *s;
+    HevFshSession *s;
 
     for (s = self->base.prev; s; s = s->prev) {
-        HevFshServerSession *fss = (HevFshServerSession *)s;
+        HevFshServerSession *ss = (HevFshServerSession *)s;
 
-        if (fss->type != type)
+        if (ss->type != type)
             continue;
-        if (memcmp (token, fss->token, sizeof (HevFshToken)) == 0)
+        if (memcmp (token, ss->token, sizeof (HevFshToken)) == 0)
             break;
     }
     if (!s) {
         for (s = self->base.next; s; s = s->next) {
-            HevFshServerSession *fss = (HevFshServerSession *)s;
+            HevFshServerSession *ss = (HevFshServerSession *)s;
 
-            if (fss->type != type)
+            if (ss->type != type)
                 continue;
-            if (memcmp (token, fss->token, sizeof (HevFshToken)) == 0)
+            if (memcmp (token, ss->token, sizeof (HevFshToken)) == 0)
                 break;
         }
     }
@@ -241,7 +213,7 @@ fsh_server_do_login (HevFshServerSession *self)
         if (0 == memcmp (zero_token, msg_token.token, sizeof (HevFshToken))) {
             hev_fsh_protocol_token_generate (self->token);
         } else {
-            HevFshServerSessionBase *s;
+            HevFshSession *s;
 
             s = fsh_server_find_session_by_token (self, TYPE_FORWARD,
                                                   msg_token.token);
@@ -309,8 +281,8 @@ fsh_server_do_connect (HevFshServerSession *self)
 static int
 fsh_server_write_message_connect (HevFshServerSession *self)
 {
-    HevFshServerSessionBase *s;
-    HevFshServerSession *fss;
+    HevFshSession *s;
+    HevFshServerSession *ss;
     HevFshMessage message;
     HevFshMessageToken message_token;
     struct msghdr mh;
@@ -337,8 +309,8 @@ fsh_server_write_message_connect (HevFshServerSession *self)
     iov[1].iov_base = &message_token;
     iov[1].iov_len = sizeof (message_token);
 
-    fss = (HevFshServerSession *)s;
-    if (hev_task_io_socket_sendmsg (fss->client_fd, &mh, MSG_WAITALL,
+    ss = (HevFshServerSession *)s;
+    if (hev_task_io_socket_sendmsg (ss->client_fd, &mh, MSG_WAITALL,
                                     fsh_task_io_yielder, self) <= 0)
         return STEP_CLOSE_SESSION;
 
@@ -349,8 +321,8 @@ static int
 fsh_server_do_accept (HevFshServerSession *self)
 {
     HevTask *task = hev_task_self ();
-    HevFshServerSessionBase *s;
-    HevFshServerSession *fss;
+    HevFshSession *s;
+    HevFshServerSession *ss;
     HevFshMessageToken message_token;
     ssize_t len;
 
@@ -367,10 +339,10 @@ fsh_server_do_accept (HevFshServerSession *self)
         return STEP_CLOSE_SESSION;
     }
 
-    fss = (HevFshServerSession *)s;
-    fss->remote_fd = self->client_fd;
+    ss = (HevFshServerSession *)s;
+    ss->remote_fd = self->client_fd;
     hev_task_del_fd (task, self->client_fd);
-    hev_task_add_fd (s->task, fss->remote_fd, POLLIN | POLLOUT);
+    hev_task_add_fd (s->task, ss->remote_fd, POLLIN | POLLOUT);
     hev_task_wakeup (s->task);
 
     self->client_fd = -1;
@@ -422,8 +394,8 @@ fsh_server_close_session (HevFshServerSession *self)
     if (self->client_fd >= 0)
         close (self->client_fd);
 
-    self->notify (self, self->notify_data);
-    hev_fsh_server_session_unref (self);
+    self->notify (&self->base, self->notify_data);
+    hev_fsh_server_session_destroy (self);
 
     return STEP_NULL;
 }
