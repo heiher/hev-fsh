@@ -2,7 +2,7 @@
  ============================================================================
  Name        : hev-fsh-client-port-listen.c
  Author      : Heiher <r@hev.cc>
- Copyright   : Copyright (c) 2018 - 2019 everyone.
+ Copyright   : Copyright (c) 2018 - 2020 everyone.
  Description : Fsh client port connect
  ============================================================================
  */
@@ -14,10 +14,11 @@
 #include <sys/types.h>
 #include <netinet/in.h>
 
-#include "hev-task.h"
-#include "hev-task-io.h"
-#include "hev-task-io-socket.h"
-#include "hev-memory-allocator.h"
+#include <hev-task.h>
+#include <hev-task-io.h>
+#include <hev-task-io-socket.h>
+#include <hev-memory-allocator.h>
+
 #include "hev-fsh-client-port-connect.h"
 
 #include "hev-fsh-client-port-listen.h"
@@ -28,20 +29,20 @@ struct _HevFshClientPortListen
 {
     HevFshClientBase base;
 
-    HevTask *task;
     HevFshConfig *config;
+    HevFshSessionManager *sm;
 };
 
 static void hev_fsh_client_port_listen_task_entry (void *data);
 static void hev_fsh_client_port_listen_destroy (HevFshClientBase *self);
 
 HevFshClientBase *
-hev_fsh_client_port_listen_new (HevFshConfig *config)
+hev_fsh_client_port_listen_new (HevFshConfig *config, HevFshSessionManager *sm)
 {
     HevFshClientPortListen *self;
+    HevFshSession *s;
     const char *addr;
     unsigned int port;
-    unsigned int timeout;
     int reuseaddr = 1;
 
     self = hev_malloc0 (sizeof (HevFshClientPortListen));
@@ -52,9 +53,8 @@ hev_fsh_client_port_listen_new (HevFshConfig *config)
 
     addr = hev_fsh_config_get_local_address (config);
     port = hev_fsh_config_get_local_port (config);
-    timeout = hev_fsh_config_get_timeout (config);
 
-    if (0 > hev_fsh_client_base_construct (&self->base, addr, port, timeout)) {
+    if (0 > hev_fsh_client_base_construct (&self->base, addr, port, sm)) {
         fprintf (stderr, "Construct client base failed!\n");
         goto exit_free;
     }
@@ -76,16 +76,18 @@ hev_fsh_client_port_listen_new (HevFshConfig *config)
         goto exit_free_base;
     }
 
-    self->task = hev_task_new (TASK_STACK_SIZE);
-    if (!self->task) {
+    s = (HevFshSession *)self;
+    s->task = hev_task_new (TASK_STACK_SIZE);
+    if (!s->task) {
         fprintf (stderr, "Create client port's task failed!\n");
         goto exit_free_base;
     }
 
+    self->sm = sm;
     self->config = config;
     self->base._destroy = hev_fsh_client_port_listen_destroy;
 
-    hev_task_run (self->task, hev_fsh_client_port_listen_task_entry, self);
+    hev_task_run (s->task, hev_fsh_client_port_listen_task_entry, self);
 
     return &self->base;
 
@@ -119,8 +121,10 @@ hev_fsh_client_port_listen_task_entry (void *data)
         if (0 > fd)
             continue;
 
-        client = hev_fsh_client_port_connect_new (self->config, fd);
+        client = hev_fsh_client_port_connect_new (self->config, fd, self->sm);
         if (!client)
             close (fd);
     }
+
+    hev_fsh_client_base_destroy (&self->base);
 }
