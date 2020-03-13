@@ -2,7 +2,7 @@
  ============================================================================
  Name        : hev-main.c
  Author      : Heiher <r@hev.cc>
- Copyright   : Copyright (c) 2017 everyone.
+ Copyright   : Copyright (c) 2017 - 2020 everyone.
  Description : Main
  ============================================================================
  */
@@ -20,14 +20,16 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 
-#include "hev-main.h"
 #include "hev-task-system.h"
 #include "hev-fsh-config.h"
 #include "hev-fsh-server.h"
+#include "hev-fsh-session-manager.h"
 #include "hev-fsh-client-forward.h"
 #include "hev-fsh-client-term-connect.h"
 #include "hev-fsh-client-port-connect.h"
 #include "hev-fsh-client-port-listen.h"
+
+#include "hev-main.h"
 
 #define MAJOR_VERSION (3)
 #define MINOR_VERSION (9)
@@ -345,34 +347,41 @@ main (int argc, char *argv[])
 
         hev_fsh_server_destroy (server);
     } else {
-        HevFshClientBase *client;
+        HevFshSessionManager *sm;
+        int timeout = hev_fsh_config_get_timeout (config);
 
         if (HEV_FSH_CONFIG_MODE_FORWARDER & mode) {
             for (;;) {
                 if (resolve_domain (config) == 0) {
-                    client = hev_fsh_client_forward_new (config);
+                    sm = hev_fsh_session_manager_new (timeout, 1);
+                    hev_fsh_session_manager_start (sm);
+
+                    hev_fsh_client_forward_new (config, sm);
 
                     hev_task_system_run ();
 
-                    hev_fsh_client_base_destroy (client);
+                    hev_fsh_session_manager_destroy (sm);
                 }
 
                 sleep (1);
             }
         } else if (HEV_FSH_CONFIG_MODE_CONNECTOR & mode) {
             if (resolve_domain (config) == 0) {
+                sm = hev_fsh_session_manager_new (timeout, 1);
+                hev_fsh_session_manager_start (sm);
+
                 if (HEV_FSH_CONFIG_MODE_CONNECTOR_PORT == mode) {
                     if (hev_fsh_config_get_local_port (config))
-                        client = hev_fsh_client_port_listen_new (config);
+                        hev_fsh_client_port_listen_new (config, sm);
                     else
-                        client = hev_fsh_client_port_connect_new (config, -1);
+                        hev_fsh_client_port_connect_new (config, -1, sm);
                 } else {
-                    client = hev_fsh_client_term_connect_new (config);
+                    hev_fsh_client_term_connect_new (config, sm);
                 }
 
                 hev_task_system_run ();
 
-                hev_fsh_client_base_destroy (client);
+                hev_fsh_session_manager_destroy (sm);
             }
         }
     }
