@@ -2,7 +2,7 @@
  ============================================================================
  Name        : hev-fsh-client-base.c
  Author      : Heiher <r@hev.cc>
- Copyright   : Copyright (c) 2018 - 2019 everyone.
+ Copyright   : Copyright (c) 2018 - 2020 everyone.
  Description : Fsh client base
  ============================================================================
  */
@@ -15,9 +15,9 @@
 #include <arpa/inet.h>
 #include <netinet/in.h>
 
-#include "hev-task.h"
-#include "hev-task-io.h"
-#include "hev-task-io-socket.h"
+#include <hev-task.h>
+#include <hev-task-io.h>
+#include <hev-task-io-socket.h>
 
 #include "hev-fsh-client-base.h"
 
@@ -48,7 +48,7 @@ exit:
 
 int
 hev_fsh_client_base_construct (HevFshClientBase *self, const char *address,
-                               unsigned int port, unsigned int timeout)
+                               unsigned int port, HevFshSessionManager *sm)
 {
     struct sockaddr_in *addr;
 
@@ -63,7 +63,10 @@ hev_fsh_client_base_construct (HevFshClientBase *self, const char *address,
     addr->sin_addr.s_addr = inet_addr (address);
     addr->sin_port = htons (port);
 
-    self->timeout = timeout;
+    self->_sm = sm;
+    self->base.hp = HEV_FSH_SESSION_HP;
+    hev_fsh_session_manager_insert (sm, &self->base);
+
     signal (SIGCHLD, SIG_IGN);
 
     return 0;
@@ -73,21 +76,8 @@ void
 hev_fsh_client_base_destroy (HevFshClientBase *self)
 {
     close (self->fd);
+    hev_fsh_session_manager_remove (self->_sm, &self->base);
+
     if (self->_destroy)
         self->_destroy (self);
-}
-
-int
-hev_fsh_client_base_task_io_yielder (HevTaskYieldType type, void *data)
-{
-    HevFshClientBase *self = data;
-
-    if (type == HEV_TASK_WAITIO) {
-        if (0 == hev_task_sleep (self->timeout * 1000))
-            return -1;
-    } else {
-        hev_task_yield (HEV_TASK_YIELD);
-    }
-
-    return 0;
 }
