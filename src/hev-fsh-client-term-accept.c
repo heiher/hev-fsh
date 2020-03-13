@@ -2,7 +2,7 @@
  ============================================================================
  Name        : hev-fsh-client-term-accept.c
  Author      : Heiher <r@hev.cc>
- Copyright   : Copyright (c) 2018 - 2019 everyone.
+ Copyright   : Copyright (c) 2018 - 2020 everyone.
  Description : Fsh client term accept
  ============================================================================
  */
@@ -24,14 +24,14 @@
 #include <libutil.h>
 #endif
 
-#include "hev-task.h"
-#include "hev-task-io.h"
-#include "hev-task-io-socket.h"
-#include "hev-memory-allocator.h"
+#include <hev-task.h>
+#include <hev-task-io.h>
+#include <hev-task-io-socket.h>
+#include <hev-memory-allocator.h>
 
 #include "hev-fsh-client-term-accept.h"
 
-#define fsh_task_io_yielder hev_fsh_client_base_task_io_yielder
+#define fsh_task_io_yielder hev_fsh_session_task_io_yielder
 
 struct _HevFshClientTermAccept
 {
@@ -42,9 +42,11 @@ static void hev_fsh_client_term_accept_task_entry (void *data);
 static void hev_fsh_client_term_accept_destroy (HevFshClientAccept *base);
 
 HevFshClientBase *
-hev_fsh_client_term_accept_new (HevFshConfig *config, HevFshToken token)
+hev_fsh_client_term_accept_new (HevFshConfig *config, HevFshToken token,
+                                HevFshSessionManager *sm)
 {
     HevFshClientTermAccept *self;
+    HevFshSession *s;
 
     self = hev_malloc0 (sizeof (HevFshClientTermAccept));
     if (!self) {
@@ -52,12 +54,13 @@ hev_fsh_client_term_accept_new (HevFshConfig *config, HevFshToken token)
         goto exit;
     }
 
-    if (0 > hev_fsh_client_accept_construct (&self->base, config, token))
+    if (0 > hev_fsh_client_accept_construct (&self->base, config, token, sm))
         goto exit_free;
 
     self->base._destroy = hev_fsh_client_term_accept_destroy;
 
-    hev_task_run (self->base.task, hev_fsh_client_term_accept_task_entry, self);
+    s = (HevFshSession *)self;
+    hev_task_run (s->task, hev_fsh_client_term_accept_task_entry, self);
 
     return &self->base.base;
 
