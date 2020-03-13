@@ -31,8 +31,8 @@
 
 #include "hev-main.h"
 
-#define MAJOR_VERSION (3)
-#define MINOR_VERSION (9)
+#define MAJOR_VERSION (4)
+#define MINOR_VERSION (0)
 #define MICRO_VERSION (0)
 
 static void
