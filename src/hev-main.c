@@ -58,7 +58,7 @@ show_help (void)
 static void
 parse_addr (const char *str, char **addr, char **port, char **token)
 {
-    char *saveptr;
+    char *saveptr = NULL;
 
     *addr = strtok_r ((char *)str, "/", &saveptr);
     if (token)
@@ -72,13 +72,13 @@ parse_addr (const char *str, char **addr, char **port, char **token)
 static void
 parse_addr_list (HevFshConfig *config, const char *str, int action)
 {
-    char *saveptr1;
+    char *saveptr1 = NULL;
 
     for (;; str = NULL) {
         char *ap;
         char *addr;
         char *port;
-        char *saveptr2;
+        char *saveptr2 = NULL;
         struct in_addr iaddr;
 
         ap = strtok_r ((char *)str, ",", &saveptr1);
@@ -101,7 +101,7 @@ parse_addr_list (HevFshConfig *config, const char *str, int action)
 static int
 parse_addr_pair (HevFshConfig *config, const char *str)
 {
-    char *saveptr;
+    char *saveptr = NULL;
     char *v1;
     char *v2;
     char *v3;
