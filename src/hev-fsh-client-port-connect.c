@@ -2,7 +2,7 @@
  ============================================================================
  Name        : hev-fsh-client-port-connect.c
  Author      : Heiher <r@hev.cc>
- Copyright   : Copyright (c) 2018 - 2019 everyone.
+ Copyright   : Copyright (c) 2018 - 2020 everyone.
  Description : Fsh client port connect
  ============================================================================
  */
@@ -15,15 +15,16 @@
 #include <arpa/inet.h>
 #include <netinet/in.h>
 
-#include "hev-task.h"
-#include "hev-task-io.h"
-#include "hev-task-io-socket.h"
-#include "hev-memory-allocator.h"
+#include <hev-task.h>
+#include <hev-task-io.h>
+#include <hev-task-io-socket.h>
+#include <hev-memory-allocator.h>
+
 #include "hev-fsh-protocol.h"
 
 #include "hev-fsh-client-port-connect.h"
 
-#define fsh_task_io_yielder hev_fsh_client_base_task_io_yielder
+#define fsh_task_io_yielder hev_fsh_session_task_io_yielder
 
 struct _HevFshClientPortConnect
 {
@@ -36,9 +37,11 @@ static void hev_fsh_client_port_connect_task_entry (void *data);
 static void hev_fsh_client_port_connect_destroy (HevFshClientConnect *base);
 
 HevFshClientBase *
-hev_fsh_client_port_connect_new (HevFshConfig *config, int local_fd)
+hev_fsh_client_port_connect_new (HevFshConfig *config, int local_fd,
+                                 HevFshSessionManager *sm)
 {
     HevFshClientPortConnect *self;
+    HevFshSession *s;
 
     self = hev_malloc0 (sizeof (HevFshClientPortConnect));
     if (!self) {
@@ -46,7 +49,7 @@ hev_fsh_client_port_connect_new (HevFshConfig *config, int local_fd)
         goto exit;
     }
 
-    if (0 > hev_fsh_client_connect_construct (&self->base, config)) {
+    if (0 > hev_fsh_client_connect_construct (&self->base, config, sm)) {
         fprintf (stderr, "Construct client connect failed!\n");
         goto exit_free;
     }
@@ -54,8 +57,8 @@ hev_fsh_client_port_connect_new (HevFshConfig *config, int local_fd)
     self->local_fd = local_fd;
     self->base._destroy = hev_fsh_client_port_connect_destroy;
 
-    hev_task_run (self->base.task, hev_fsh_client_port_connect_task_entry,
-                  self);
+    s = (HevFshSession *)self;
+    hev_task_run (s->task, hev_fsh_client_port_connect_task_entry, self);
 
     return &self->base.base;
 
@@ -87,7 +90,7 @@ hev_fsh_client_port_connect_task_entry (void *data)
     ssize_t len;
 
     if (0 > hev_fsh_client_connect_send_connect (&self->base))
-        return;
+        goto exit;
 
     address = hev_fsh_config_get_remote_address (self->base.config);
     port = hev_fsh_config_get_remote_port (self->base.config);
@@ -100,7 +103,7 @@ hev_fsh_client_port_connect_task_entry (void *data)
                                    sizeof (message_port_info), MSG_WAITALL,
                                    fsh_task_io_yielder, self);
     if (len <= 0)
-        return;
+        goto exit;
 
     if (-1 == self->local_fd) {
         ifd = 0;
@@ -111,11 +114,11 @@ hev_fsh_client_port_connect_task_entry (void *data)
     }
 
     if (fcntl (ifd, F_SETFL, O_NONBLOCK) == -1)
-        return;
+        goto exit;
 
     if (ifd != ofd) {
         if (fcntl (ofd, F_SETFL, O_NONBLOCK) == -1)
-            return;
+            goto exit;
 
         hev_task_add_fd (task, ifd, POLLIN);
         hev_task_add_fd (task, ofd, POLLOUT);
@@ -125,4 +128,7 @@ hev_fsh_client_port_connect_task_entry (void *data)
 
     hev_task_io_splice (self->base.base.fd, self->base.base.fd, ifd, ofd, 8192,
                         fsh_task_io_yielder, self);
+
+exit:
+    hev_fsh_client_base_destroy (&self->base.base);
 }

@@ -2,7 +2,7 @@
  ============================================================================
  Name        : hev-fsh-client-port-connect.h
  Author      : Heiher <r@hev.cc>
- Copyright   : Copyright (c) 2018 - 2019 everyone.
+ Copyright   : Copyright (c) 2018 - 2020 everyone.
  Description : Fsh client port connect
  ============================================================================
  */
@@ -11,10 +11,12 @@
 #define __HEV_FSH_CLIENT_PORT_CONNECT_H__
 
 #include "hev-fsh-client-connect.h"
+#include "hev-fsh-session-manager.h"
 
 typedef struct _HevFshClientPortConnect HevFshClientPortConnect;
 
 HevFshClientBase *hev_fsh_client_port_connect_new (HevFshConfig *config,
-                                                   int local_fd);
+                                                   int local_fd,
+                                                   HevFshSessionManager *sm);
 
 #endif /* __HEV_FSH_CLIENT_PORT_CONNECT_H__ */
