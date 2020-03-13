@@ -2,7 +2,7 @@
  ============================================================================
  Name        : hev-fsh-client-accept.c
  Author      : Heiher <r@hev.cc>
- Copyright   : Copyright (c) 2018 - 2019 everyone.
+ Copyright   : Copyright (c) 2018 - 2020 everyone.
  Description : Fsh client accept
  ============================================================================
  */
@@ -12,36 +12,35 @@
 #include <sys/types.h>
 #include <netinet/in.h>
 
-#include "hev-task.h"
-#include "hev-task-io.h"
-#include "hev-task-io-socket.h"
+#include <hev-task.h>
+#include <hev-task-io.h>
+#include <hev-task-io-socket.h>
 
 #include "hev-fsh-client-accept.h"
 
 #define TASK_STACK_SIZE (16384)
-#define fsh_task_io_yielder hev_fsh_client_base_task_io_yielder
+#define fsh_task_io_yielder hev_fsh_session_task_io_yielder
 
 static void hev_fsh_client_accept_destroy (HevFshClientBase *base);
 
 int
 hev_fsh_client_accept_construct (HevFshClientAccept *self, HevFshConfig *config,
-                                 HevFshToken token)
+                                 HevFshToken token, HevFshSessionManager *sm)
 {
+    HevFshSession *s = (HevFshSession *)self;
     const char *addr;
     unsigned int port;
-    unsigned int timeout;
 
     addr = hev_fsh_config_get_server_address (config);
     port = hev_fsh_config_get_server_port (config);
-    timeout = hev_fsh_config_get_timeout (config);
 
-    if (0 > hev_fsh_client_base_construct (&self->base, addr, port, timeout)) {
+    if (0 > hev_fsh_client_base_construct (&self->base, addr, port, sm)) {
         fprintf (stderr, "Construct client base failed!\n");
         goto exit;
     }
 
-    self->task = hev_task_new (TASK_STACK_SIZE);
-    if (!self->task) {
+    s->task = hev_task_new (TASK_STACK_SIZE);
+    if (!s->task) {
         fprintf (stderr, "Create client accept's task failed!\n");
         goto exit_free;
     }
