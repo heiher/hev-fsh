@@ -45,7 +45,7 @@ hev_fsh_client_port_accept_new (HevFshConfig *config, HevFshToken token,
         goto exit;
     }
 
-    if (0 > hev_fsh_client_accept_construct (&self->base, config, token, sm)) {
+    if (hev_fsh_client_accept_construct (&self->base, config, token, sm) < 0) {
         goto exit_free;
     }
 
@@ -88,8 +88,8 @@ hev_fsh_client_port_accept_task_entry (void *data)
         goto quit;
 
     if (!hev_fsh_config_addr_list_contains (
-            self->base.config, message_port_info.type, message_port_info.addr,
-            message_port_info.port))
+            self->base.base.config, message_port_info.type,
+            message_port_info.addr, message_port_info.port))
         goto quit;
 
     switch (message_port_info.type) {
@@ -103,7 +103,7 @@ hev_fsh_client_port_accept_task_entry (void *data)
     addr.sin_port = message_port_info.port;
 
     lfd = hev_task_io_socket_socket (AF_INET, SOCK_STREAM, 0);
-    if (0 > lfd)
+    if (lfd < 0)
         goto quit;
 
     hev_task_add_fd (task, lfd, POLLIN | POLLOUT);
