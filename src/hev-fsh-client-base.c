@@ -9,6 +9,7 @@
 
 #include <stdio.h>
 #include <fcntl.h>
+#include <netdb.h>
 #include <unistd.h>
 #include <string.h>
 #include <signal.h>
@@ -27,15 +28,15 @@ hev_fsh_client_base_socket (void)
     int fd, flags;
 
     fd = hev_task_io_socket_socket (AF_INET, SOCK_STREAM, 0);
-    if (fd == -1)
+    if (fd < 0)
         goto exit;
 
     flags = fcntl (fd, F_GETFD);
-    if (flags == -1)
+    if (flags < 0)
         goto exit_close;
 
     flags |= FD_CLOEXEC;
-    if (fcntl (fd, F_SETFD, flags) == -1)
+    if (fcntl (fd, F_SETFD, flags) < 0)
         goto exit_close;
 
     return fd;
@@ -47,23 +48,17 @@ exit:
 }
 
 int
-hev_fsh_client_base_construct (HevFshClientBase *self, const char *address,
-                               unsigned int port, HevFshSessionManager *sm)
+hev_fsh_client_base_construct (HevFshClientBase *self, HevFshConfig *config,
+                               HevFshSessionManager *sm)
 {
-    struct sockaddr_in *addr;
-
     self->fd = hev_fsh_client_base_socket ();
-    if (self->fd == -1) {
+    if (self->fd < 0) {
         fprintf (stderr, "Create client's socket failed!\n");
         return -1;
     }
 
-    addr = (struct sockaddr_in *)&self->address;
-    addr->sin_family = AF_INET;
-    addr->sin_addr.s_addr = inet_addr (address);
-    addr->sin_port = htons (port);
-
     self->_sm = sm;
+    self->config = config;
     self->base.hp = HEV_FSH_SESSION_HP;
     hev_fsh_session_manager_insert (sm, &self->base);
 
@@ -80,4 +75,33 @@ hev_fsh_client_base_destroy (HevFshClientBase *self)
 
     if (self->_destroy)
         self->_destroy (self);
+}
+
+int
+hev_fsh_client_base_resolv (HevFshClientBase *self, struct sockaddr *_addr)
+{
+    struct sockaddr_in *address;
+    const char *addr;
+    int port;
+
+    addr = hev_fsh_config_get_server_address (self->config);
+    port = hev_fsh_config_get_server_port (self->config);
+
+    address = (struct sockaddr_in *)_addr;
+    address->sin_family = AF_INET;
+    address->sin_addr.s_addr = inet_addr (addr);
+    address->sin_port = htons (port);
+
+    if (address->sin_addr.s_addr == INADDR_NONE) {
+        struct hostent *h;
+
+        h = gethostbyname (addr);
+        if (!h)
+            return -1;
+
+        address->sin_family = h->h_addrtype;
+        address->sin_addr.s_addr = *(in_addr_t *)h->h_addr;
+    }
+
+    return 0;
 }
