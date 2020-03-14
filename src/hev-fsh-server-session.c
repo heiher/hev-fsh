@@ -14,10 +14,11 @@
 #include <arpa/inet.h>
 #include <time.h>
 
-#include "hev-task.h"
-#include "hev-task-io.h"
-#include "hev-task-io-socket.h"
-#include "hev-memory-allocator.h"
+#include <hev-task.h>
+#include <hev-task-io.h>
+#include <hev-task-io-socket.h>
+#include <hev-memory-allocator.h>
+
 #include "hev-fsh-protocol.h"
 
 #include "hev-fsh-server-session.h"
@@ -197,7 +198,7 @@ fsh_server_read_message (HevFshServerSession *self)
 static int
 fsh_server_do_login (HevFshServerSession *self)
 {
-    if (1 == self->msg_ver) {
+    if (self->msg_ver == 1) {
         hev_fsh_protocol_token_generate (self->token);
     } else {
         HevFshMessageToken msg_token;
@@ -210,7 +211,7 @@ fsh_server_do_login (HevFshServerSession *self)
         if (len <= 0)
             return STEP_CLOSE_SESSION;
 
-        if (0 == memcmp (zero_token, msg_token.token, sizeof (HevFshToken))) {
+        if (memcmp (zero_token, msg_token.token, sizeof (HevFshToken)) == 0) {
             hev_fsh_protocol_token_generate (self->token);
         } else {
             HevFshSession *s;
@@ -354,7 +355,7 @@ fsh_server_do_keep_alive (HevFshServerSession *self)
 {
     HevFshMessage message;
 
-    if (1 != self->msg_ver) {
+    if (self->msg_ver != 1) {
         message.ver = 1;
         message.cmd = HEV_FSH_CMD_KEEP_ALIVE;
 
