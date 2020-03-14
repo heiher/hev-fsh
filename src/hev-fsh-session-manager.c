@@ -126,6 +126,9 @@ hev_fsh_session_manager_task_entry (void *data)
         printf ("Enumerating sessions ...\n");
 #endif
         for (s = self->sessions; s; s = s->next) {
+#ifdef _DEBUG
+            printf ("Session %p's hp %d\n", s, s->hp);
+#endif
             if (self->quit) {
                 s->hp = 0;
             } else {
@@ -133,9 +136,6 @@ hev_fsh_session_manager_task_entry (void *data)
                 if (s->hp > 0)
                     continue;
             }
-#ifdef _DEBUG
-            printf ("Session %p's hp %d\n", s, s->hp);
-#endif
 
             hev_task_wakeup (s->task);
 #ifdef _DEBUG
