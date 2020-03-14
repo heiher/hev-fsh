@@ -10,14 +10,11 @@
 #ifndef __HEV_FSH_SERVER_H__
 #define __HEV_FSH_SERVER_H__
 
+#include "hev-fsh-base.h"
 #include "hev-fsh-config.h"
 
 typedef struct _HevFshServer HevFshServer;
 
-HevFshServer *hev_fsh_server_new (HevFshConfig *config);
-void hev_fsh_server_destroy (HevFshServer *self);
-
-void hev_fsh_server_start (HevFshServer *self);
-void hev_fsh_server_stop (HevFshServer *self);
+HevFshBase *hev_fsh_server_new (HevFshConfig *config);
 
 #endif /* __HEV_FSH_SERVER_H__ */
