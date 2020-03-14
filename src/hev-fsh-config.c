@@ -2,7 +2,7 @@
  ============================================================================
  Name        : hev-fsh-config.c
  Author      : Heiher <r@hev.cc>
- Copyright   : Copyright (c) 2018 everyone.
+ Copyright   : Copyright (c) 2018 - 2020 everyone.
  Description : Fsh Config
  ============================================================================
  */
@@ -19,7 +19,6 @@ struct _HevFshConfig
 {
     int mode;
 
-    const char *server_domain;
     const char *server_address;
     unsigned int server_port;
     unsigned int timeout;
@@ -102,20 +101,6 @@ hev_fsh_config_set_mode (HevFshConfig *self, int val)
             self->server_address = "127.0.0.1";
         break;
     }
-
-    self->server_domain = self->server_address;
-}
-
-const char *
-hev_fsh_config_get_server_domain (HevFshConfig *self)
-{
-    return self->server_domain;
-}
-
-void
-hev_fsh_config_set_server_domain (HevFshConfig *self, const char *val)
-{
-    self->server_domain = val;
 }
 
 const char *
