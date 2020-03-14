@@ -17,6 +17,8 @@
 typedef struct _HevFshClientForward HevFshClientForward;
 
 HevFshClientBase *hev_fsh_client_forward_new (HevFshConfig *config,
-                                              HevFshSessionManager *sm);
+                                              HevFshSessionManager *sm,
+                                              HevFshSessionNotify notify,
+                                              void *notify_data);
 
 #endif /* __HEV_FSH_CLIENT_FORWARD_H__ */
