@@ -21,8 +21,6 @@ struct _HevFshClientConnect
 {
     HevFshClientBase base;
 
-    HevFshConfig *config;
-
     /* private */
     HevFshClientConnectDestroy _destroy;
 };
