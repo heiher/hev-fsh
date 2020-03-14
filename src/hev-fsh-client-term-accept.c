@@ -54,7 +54,7 @@ hev_fsh_client_term_accept_new (HevFshConfig *config, HevFshToken token,
         goto exit;
     }
 
-    if (0 > hev_fsh_client_accept_construct (&self->base, config, token, sm))
+    if (hev_fsh_client_accept_construct (&self->base, config, token, sm) < 0)
         goto exit_free;
 
     self->base._destroy = hev_fsh_client_term_accept_destroy;
@@ -88,7 +88,7 @@ hev_fsh_client_term_accept_task_entry (void *data)
     pid_t pid;
 
     sfd = self->base.base.fd;
-    if (0 > hev_fsh_client_accept_send_accept (&self->base))
+    if (hev_fsh_client_accept_send_accept (&self->base) < 0)
         goto quit;
 
     /* recv message term info */
@@ -112,7 +112,7 @@ hev_fsh_client_term_accept_task_entry (void *data)
         if (getuid () == 0) {
             const char *user;
 
-            user = hev_fsh_config_get_user (self->base.config);
+            user = hev_fsh_config_get_user (self->base.base.config);
             if (user) {
                 struct passwd *pwd;
 
@@ -146,7 +146,7 @@ hev_fsh_client_term_accept_task_entry (void *data)
         ioctl (pfd, TIOCSWINSZ, &win_size);
     }
 
-    if (fcntl (pfd, F_SETFL, O_NONBLOCK) == -1)
+    if (fcntl (pfd, F_SETFL, O_NONBLOCK) < 0)
         goto quit_close_fd;
 
     hev_task_add_fd (task, pfd, POLLIN | POLLOUT);
