@@ -49,7 +49,7 @@ hev_fsh_client_port_connect_new (HevFshConfig *config, int local_fd,
         goto exit;
     }
 
-    if (0 > hev_fsh_client_connect_construct (&self->base, config, sm)) {
+    if (hev_fsh_client_connect_construct (&self->base, config, sm) < 0) {
         fprintf (stderr, "Construct client connect failed!\n");
         goto exit_free;
     }
@@ -73,7 +73,7 @@ hev_fsh_client_port_connect_destroy (HevFshClientConnect *base)
 {
     HevFshClientPortConnect *self = (HevFshClientPortConnect *)base;
 
-    if (-1 != self->local_fd)
+    if (self->local_fd >= 0)
         close (self->local_fd);
     hev_free (self);
 }
@@ -89,11 +89,12 @@ hev_fsh_client_port_connect_task_entry (void *data)
     int ifd, ofd;
     ssize_t len;
 
-    if (0 > hev_fsh_client_connect_send_connect (&self->base))
+    if (hev_fsh_client_connect_send_connect (&self->base) < 0)
         goto exit;
 
-    address = hev_fsh_config_get_remote_address (self->base.config);
-    port = hev_fsh_config_get_remote_port (self->base.config);
+    address = hev_fsh_config_get_remote_address (self->base.base.config);
+    port = hev_fsh_config_get_remote_port (self->base.base.config);
+
     message_port_info.type = 4;
     message_port_info.port = htons (port);
     inet_aton (address, (struct in_addr *)&message_port_info.addr);
@@ -105,7 +106,7 @@ hev_fsh_client_port_connect_task_entry (void *data)
     if (len <= 0)
         goto exit;
 
-    if (-1 == self->local_fd) {
+    if (self->local_fd < 0) {
         ifd = 0;
         ofd = 1;
     } else {
@@ -113,11 +114,11 @@ hev_fsh_client_port_connect_task_entry (void *data)
         ofd = self->local_fd;
     }
 
-    if (fcntl (ifd, F_SETFL, O_NONBLOCK) == -1)
+    if (fcntl (ifd, F_SETFL, O_NONBLOCK) < 0)
         goto exit;
 
     if (ifd != ofd) {
-        if (fcntl (ofd, F_SETFL, O_NONBLOCK) == -1)
+        if (fcntl (ofd, F_SETFL, O_NONBLOCK) < 0)
             goto exit;
 
         hev_task_add_fd (task, ifd, POLLIN);
