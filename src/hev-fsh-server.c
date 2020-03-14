@@ -210,13 +210,10 @@ hev_fsh_server_worker_task_entry (void *data)
 
     for (;;) {
         int fd;
-        struct sockaddr_in addr;
-        struct sockaddr *in_addr = (struct sockaddr *)&addr;
-        socklen_t addr_len = sizeof (addr);
         HevFshServerSession *ss;
         HevFshSession *s;
 
-        fd = hev_task_io_socket_accept (self->fd, in_addr, &addr_len,
+        fd = hev_task_io_socket_accept (self->fd, NULL, NULL,
                                         fsh_task_io_yielder, self);
         if (-2 == fd) {
             break;
@@ -224,11 +221,6 @@ hev_fsh_server_worker_task_entry (void *data)
             fprintf (stderr, "Accept failed!\n");
             continue;
         }
-
-#ifdef _DEBUG
-        printf ("New client %d enter from %s:%u\n", fd,
-                inet_ntoa (addr.sin_addr), ntohs (addr.sin_port));
-#endif
 
         ss = hev_fsh_server_session_new (fd, session_close_handler, self);
         if (!ss) {
