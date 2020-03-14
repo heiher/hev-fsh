@@ -7,33 +7,25 @@
  ============================================================================
  */
 
+#include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <unistd.h>
 #include <signal.h>
 #include <string.h>
-#include <fcntl.h>
-#include <netdb.h>
-#include <sys/types.h>
+#include <unistd.h>
 #include <sys/stat.h>
-#include <sys/socket.h>
-#include <netinet/in.h>
+#include <sys/types.h>
 #include <arpa/inet.h>
 
-#include "hev-task-system.h"
+#include <hev-task-system.h>
+
 #include "hev-fsh-config.h"
 #include "hev-fsh-server.h"
-#include "hev-fsh-session-manager.h"
-#include "hev-fsh-client-forward.h"
-#include "hev-fsh-client-term-connect.h"
-#include "hev-fsh-client-port-connect.h"
-#include "hev-fsh-client-port-listen.h"
+#include "hev-fsh-client.h"
 
 #include "hev-main.h"
 
-#define MAJOR_VERSION (4)
-#define MINOR_VERSION (0)
-#define MICRO_VERSION (0)
+static HevFshBase *instance;
 
 static void
 show_help (void)
@@ -259,6 +251,13 @@ parse_args (HevFshConfig *config, int argc, char *argv[])
     return 0;
 }
 
+static void
+signal_handler (int signum)
+{
+    if (instance)
+        hev_fsh_base_stop (instance);
+}
+
 static int
 setup_log (int mode, const char *log)
 {
@@ -282,24 +281,6 @@ setup_log (int mode, const char *log)
     return 0;
 }
 
-static int
-resolve_domain (HevFshConfig *config)
-{
-    static char address[64];
-    struct hostent *h;
-
-    h = gethostbyname (hev_fsh_config_get_server_domain (config));
-    if (!h)
-        return -1;
-
-    if (!inet_ntop (h->h_addrtype, h->h_addr, address, sizeof (address)))
-        return -1;
-
-    hev_fsh_config_set_server_address (config, address);
-
-    return 0;
-}
-
 int
 main (int argc, char *argv[])
 {
@@ -307,11 +288,14 @@ main (int argc, char *argv[])
     int mode;
     const char *log;
 
+    if (hev_task_system_init () < 0)
+        return -1;
+
     config = hev_fsh_config_new ();
     if (!config)
         return -1;
 
-    if (0 > parse_args (config, argc, argv)) {
+    if (parse_args (config, argc, argv) < 0) {
         show_help ();
         return -1;
     }
@@ -319,75 +303,31 @@ main (int argc, char *argv[])
     mode = hev_fsh_config_get_mode (config);
     log = hev_fsh_config_get_log (config);
 
-    if (0 > setup_log (mode, log))
+    if (setup_log (mode, log) < 0)
         return -1;
 
-    if (SIG_ERR == signal (SIGPIPE, SIG_IGN)) {
-        fprintf (stderr, "Set signal pipe's handler failed!\n");
+    if (signal (SIGPIPE, SIG_IGN) == SIG_ERR)
         return -1;
-    }
-
-    if (0 > hev_task_system_init ()) {
-        fprintf (stderr, "Init task system failed!\n");
+    if (signal (SIGINT, signal_handler) == SIG_ERR)
         return -1;
-    }
+    if (signal (SIGTERM, signal_handler) == SIG_ERR)
+        return -1;
 
-    if (HEV_FSH_CONFIG_MODE_SERVER == mode) {
-        HevFshServer *server;
+    if (HEV_FSH_CONFIG_MODE_SERVER == mode)
+        instance = hev_fsh_server_new (config);
+    else
+        instance = hev_fsh_client_new (config);
 
-        server = hev_fsh_server_new (config);
-        if (!server) {
-            fprintf (stderr, "Create fsh server failed!\n");
-            return -1;
-        }
+    if (!instance)
+        return -1;
 
-        hev_fsh_server_start (server);
+    hev_fsh_base_start (instance);
 
-        hev_task_system_run ();
+    hev_task_system_run ();
 
-        hev_fsh_server_destroy (server);
-    } else {
-        HevFshSessionManager *sm;
-        int timeout = hev_fsh_config_get_timeout (config);
-
-        if (HEV_FSH_CONFIG_MODE_FORWARDER & mode) {
-            for (;;) {
-                if (resolve_domain (config) == 0) {
-                    sm = hev_fsh_session_manager_new (timeout, 1);
-                    hev_fsh_session_manager_start (sm);
-
-                    hev_fsh_client_forward_new (config, sm);
-
-                    hev_task_system_run ();
-
-                    hev_fsh_session_manager_destroy (sm);
-                }
-
-                sleep (1);
-            }
-        } else if (HEV_FSH_CONFIG_MODE_CONNECTOR & mode) {
-            if (resolve_domain (config) == 0) {
-                sm = hev_fsh_session_manager_new (timeout, 1);
-                hev_fsh_session_manager_start (sm);
-
-                if (HEV_FSH_CONFIG_MODE_CONNECTOR_PORT == mode) {
-                    if (hev_fsh_config_get_local_port (config))
-                        hev_fsh_client_port_listen_new (config, sm);
-                    else
-                        hev_fsh_client_port_connect_new (config, -1, sm);
-                } else {
-                    hev_fsh_client_term_connect_new (config, sm);
-                }
-
-                hev_task_system_run ();
-
-                hev_fsh_session_manager_destroy (sm);
-            }
-        }
-    }
-
-    hev_task_system_fini ();
+    hev_fsh_base_destroy (instance);
     hev_fsh_config_destroy (config);
+    hev_task_system_fini ();
 
     return 0;
 }
