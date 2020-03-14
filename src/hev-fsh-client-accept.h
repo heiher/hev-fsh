@@ -23,7 +23,6 @@ struct _HevFshClientAccept
     HevFshClientBase base;
 
     HevFshToken token;
-    HevFshConfig *config;
 
     /* private */
     HevFshClientAcceptDestroy _destroy;

@@ -28,13 +28,8 @@ hev_fsh_client_accept_construct (HevFshClientAccept *self, HevFshConfig *config,
                                  HevFshToken token, HevFshSessionManager *sm)
 {
     HevFshSession *s = (HevFshSession *)self;
-    const char *addr;
-    unsigned int port;
 
-    addr = hev_fsh_config_get_server_address (config);
-    port = hev_fsh_config_get_server_port (config);
-
-    if (0 > hev_fsh_client_base_construct (&self->base, addr, port, sm)) {
+    if (hev_fsh_client_base_construct (&self->base, config, sm) < 0) {
         fprintf (stderr, "Construct client base failed!\n");
         goto exit;
     }
@@ -45,7 +40,6 @@ hev_fsh_client_accept_construct (HevFshClientAccept *self, HevFshConfig *config,
         goto exit_free;
     }
 
-    self->config = config;
     memcpy (self->token, token, sizeof (HevFshToken));
     self->base._destroy = hev_fsh_client_accept_destroy;
 
@@ -72,6 +66,8 @@ hev_fsh_client_accept_send_accept (HevFshClientAccept *self)
     HevTask *task = hev_task_self ();
     HevFshMessage message;
     HevFshMessageToken message_token;
+    struct sockaddr_in address;
+    struct sockaddr *addr;
     struct msghdr mh;
     struct iovec iov[2];
     int fd;
@@ -79,8 +75,11 @@ hev_fsh_client_accept_send_accept (HevFshClientAccept *self)
     fd = self->base.fd;
     hev_task_add_fd (task, fd, POLLIN | POLLOUT);
 
-    if (hev_task_io_socket_connect (fd, &self->base.address,
-                                    sizeof (struct sockaddr_in),
+    addr = (struct sockaddr *)&address;
+    if (hev_fsh_client_base_resolv (&self->base, addr) < 0)
+        return -1;
+
+    if (hev_task_io_socket_connect (fd, addr, sizeof (address),
                                     fsh_task_io_yielder, self) < 0)
         return -1;
 
