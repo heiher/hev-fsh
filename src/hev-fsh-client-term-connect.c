@@ -46,7 +46,7 @@ hev_fsh_client_term_connect_new (HevFshConfig *config, HevFshSessionManager *sm)
         goto exit;
     }
 
-    if (0 > hev_fsh_client_connect_construct (&self->base, config, sm)) {
+    if (hev_fsh_client_connect_construct (&self->base, config, sm) < 0) {
         fprintf (stderr, "Construct client connect failed!\n");
         goto exit_free;
     }
@@ -80,7 +80,7 @@ hev_fsh_client_term_connect_task_entry (void *data)
     struct winsize win_size;
     ssize_t len;
 
-    if (0 > hev_fsh_client_connect_send_connect (&self->base))
+    if (hev_fsh_client_connect_send_connect (&self->base) < 0)
         goto exit;
 
     if (ioctl (0, TIOCGWINSZ, &win_size) < 0)
@@ -96,21 +96,21 @@ hev_fsh_client_term_connect_task_entry (void *data)
     if (len <= 0)
         goto exit;
 
-    if (fcntl (0, F_SETFL, O_NONBLOCK) == -1)
+    if (fcntl (0, F_SETFL, O_NONBLOCK) < 0)
         goto exit;
-    if (fcntl (1, F_SETFL, O_NONBLOCK) == -1)
+    if (fcntl (1, F_SETFL, O_NONBLOCK) < 0)
         goto exit;
 
     hev_task_add_fd (task, 0, POLLIN);
     hev_task_add_fd (task, 1, POLLOUT);
 
-    if (tcgetattr (0, &term) == -1)
+    if (tcgetattr (0, &term) < 0)
         goto exit;
 
     memcpy (&term_rsh, &term, sizeof (term));
     term_rsh.c_oflag &= ~(OPOST);
     term_rsh.c_lflag &= ~(ISIG | ICANON | IEXTEN | ECHO | ECHOE | ECHOK);
-    if (tcsetattr (0, TCSADRAIN, &term_rsh) == -1)
+    if (tcsetattr (0, TCSADRAIN, &term_rsh) < 0)
         goto exit;
 
     hev_task_io_splice (self->base.base.fd, self->base.base.fd, 0, 1, 8192,
