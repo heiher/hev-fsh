@@ -25,7 +25,6 @@
 
 #include "hev-fsh-client-forward.h"
 
-#define TASK_STACK_SIZE (16384)
 #define fsh_task_io_yielder hev_fsh_session_task_io_yielder
 
 struct _HevFshClientForward
@@ -59,7 +58,7 @@ hev_fsh_client_forward_new (HevFshConfig *config, HevFshSessionManager *sm,
     }
 
     s = (HevFshSession *)self;
-    s->task = hev_task_new (TASK_STACK_SIZE);
+    s->task = hev_task_new (HEV_FSH_CONFIG_TASK_STACK_SIZE);
     if (!s->task) {
         fprintf (stderr, "Create client forward's task failed!\n");
         goto exit_free_base;
