@@ -9,8 +9,9 @@
 
 #include <stdio.h>
 
-#include "hev-memory-allocator.h"
+#include <hev-memory-allocator.h>
 
+#include "hev-fsh-config.h"
 #include "hev-fsh-session.h"
 
 #include "hev-fsh-session-manager.h"
@@ -38,7 +39,7 @@ hev_fsh_session_manager_new (int timeout, int autostop)
         goto exit;
     }
 
-    self->task = hev_task_new (8192);
+    self->task = hev_task_new (HEV_FSH_CONFIG_TASK_STACK_SIZE);
     if (!self->task) {
         fprintf (stderr, "Create session manager's task failed!\n");
         goto exit_free;
