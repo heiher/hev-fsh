@@ -13,6 +13,8 @@
 #include "hev-fsh-client-accept.h"
 #include "hev-fsh-session-manager.h"
 
+#define HEV_FSH_CLIENT_TERM_ACCEPT(p) ((HevFshClientTermAccept *)p)
+
 typedef struct _HevFshClientTermAccept HevFshClientTermAccept;
 
 HevFshClientBase *hev_fsh_client_term_accept_new (HevFshConfig *config,

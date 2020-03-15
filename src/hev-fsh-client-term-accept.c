@@ -7,9 +7,9 @@
  ============================================================================
  */
 
+#include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <fcntl.h>
 #include <string.h>
 #include <unistd.h>
 #include <sys/types.h>
@@ -69,11 +69,10 @@ hev_fsh_client_term_accept_new (HevFshConfig *config, HevFshToken token,
     if (hev_fsh_client_accept_construct (&self->base, config, token, sm) < 0)
         goto exit_free;
 
-    self->base._destroy = hev_fsh_client_term_accept_destroy;
-
-    s = (HevFshSession *)self;
+    s = HEV_FSH_SESSION (self);
     hev_task_run (s->task, hev_fsh_client_term_accept_task_entry, self);
 
+    self->base._destroy = hev_fsh_client_term_accept_destroy;
     return &self->base.base;
 
 exit_free:
@@ -154,13 +153,11 @@ forkpty_entry (HevTaskCall *call)
 static void
 hev_fsh_client_term_accept_task_entry (void *data)
 {
-    HevTask *task = hev_task_self ();
-    HevFshClientTermAccept *self = data;
-    HevFshMessageTermInfo msg_term_info;
+    HevFshClientTermAccept *self = HEV_FSH_CLIENT_TERM_ACCEPT (data);
+    HevFshMessageTermInfo msg_tinfo;
     HevTaskCallForkPty *fpty;
     HevTaskCall *call;
     int sfd, pfd;
-    ssize_t len;
     void *ptr;
 
     sfd = self->base.base.fd;
@@ -168,9 +165,8 @@ hev_fsh_client_term_accept_task_entry (void *data)
         goto quit;
 
     /* recv msg term info */
-    len = hev_task_io_socket_recv (sfd, &msg_term_info, sizeof (msg_term_info),
-                                   MSG_WAITALL, fsh_task_io_yielder, self);
-    if (len <= 0)
+    if (hev_task_io_socket_recv (sfd, &msg_tinfo, sizeof (msg_tinfo),
+                                 MSG_WAITALL, fsh_task_io_yielder, self) <= 0)
         goto quit;
 
     call = hev_task_call_new (sizeof (HevTaskCallForkPty), 16384);
@@ -179,8 +175,8 @@ hev_fsh_client_term_accept_task_entry (void *data)
 
     fpty = (HevTaskCallForkPty *)call;
     fpty->pfd = &pfd;
+    fpty->term_info = &msg_tinfo;
     fpty->config = self->base.base.config;
-    fpty->term_info = &msg_term_info;
 
     ptr = hev_task_call_jump (call, forkpty_entry);
     hev_task_call_destroy (call);
@@ -190,7 +186,7 @@ hev_fsh_client_term_accept_task_entry (void *data)
     if (fcntl (pfd, F_SETFL, O_NONBLOCK) < 0)
         goto quit_close_fd;
 
-    hev_task_add_fd (task, pfd, POLLIN | POLLOUT);
+    hev_task_add_fd (hev_task_self (), pfd, POLLIN | POLLOUT);
     hev_task_io_splice (sfd, sfd, pfd, pfd, 8192, fsh_task_io_yielder, self);
 
 quit_close_fd:
