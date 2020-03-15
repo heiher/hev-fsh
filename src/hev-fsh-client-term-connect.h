@@ -13,6 +13,8 @@
 #include "hev-fsh-client-connect.h"
 #include "hev-fsh-session-manager.h"
 
+#define HEV_FSH_CLIENT_TERM_CONNECT(p) ((HevFshClientTermConnect *)p)
+
 typedef struct _HevFshClientTermConnect HevFshClientTermConnect;
 
 HevFshClientBase *hev_fsh_client_term_connect_new (HevFshConfig *config,

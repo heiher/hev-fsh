@@ -7,13 +7,13 @@
  ============================================================================
  */
 
-#include <stdio.h>
 #include <fcntl.h>
+#include <stdio.h>
 #include <string.h>
 #include <unistd.h>
+#include <termios.h>
 #include <sys/types.h>
 #include <sys/ioctl.h>
-#include <termios.h>
 
 #include <hev-task.h>
 #include <hev-task-io.h>
@@ -51,11 +51,10 @@ hev_fsh_client_term_connect_new (HevFshConfig *config, HevFshSessionManager *sm)
         goto exit_free;
     }
 
-    self->base._destroy = hev_fsh_client_term_connect_destroy;
-
-    s = (HevFshSession *)self;
+    s = HEV_FSH_SESSION (self);
     hev_task_run (s->task, hev_fsh_client_term_connect_task_entry, self);
 
+    self->base._destroy = hev_fsh_client_term_connect_destroy;
     return &self->base.base;
 
 exit_free:
@@ -73,12 +72,10 @@ hev_fsh_client_term_connect_destroy (HevFshClientConnect *base)
 static void
 hev_fsh_client_term_connect_task_entry (void *data)
 {
-    HevTask *task = hev_task_self ();
-    HevFshClientTermConnect *self = data;
-    HevFshMessageTermInfo message_term_info;
+    HevFshClientTermConnect *self = HEV_FSH_CLIENT_TERM_CONNECT (data);
+    HevFshMessageTermInfo msg_tinfo;
     struct termios term, term_rsh;
     struct winsize win_size;
-    ssize_t len;
 
     if (hev_fsh_client_connect_send_connect (&self->base) < 0)
         goto exit;
@@ -86,14 +83,13 @@ hev_fsh_client_term_connect_task_entry (void *data)
     if (ioctl (0, TIOCGWINSZ, &win_size) < 0)
         goto exit;
 
-    message_term_info.rows = win_size.ws_row;
-    message_term_info.columns = win_size.ws_col;
+    msg_tinfo.rows = win_size.ws_row;
+    msg_tinfo.columns = win_size.ws_col;
 
     /* send message term info */
-    len = hev_task_io_socket_send (self->base.base.fd, &message_term_info,
-                                   sizeof (message_term_info), MSG_WAITALL,
-                                   fsh_task_io_yielder, self);
-    if (len <= 0)
+    if (hev_task_io_socket_send (self->base.base.fd, &msg_tinfo,
+                                 sizeof (msg_tinfo), MSG_WAITALL,
+                                 fsh_task_io_yielder, self) <= 0)
         goto exit;
 
     if (fcntl (0, F_SETFL, O_NONBLOCK) < 0)
@@ -101,8 +97,8 @@ hev_fsh_client_term_connect_task_entry (void *data)
     if (fcntl (1, F_SETFL, O_NONBLOCK) < 0)
         goto exit;
 
-    hev_task_add_fd (task, 0, POLLIN);
-    hev_task_add_fd (task, 1, POLLOUT);
+    hev_task_add_fd (hev_task_self (), 0, POLLIN);
+    hev_task_add_fd (hev_task_self (), 1, POLLOUT);
 
     if (tcgetattr (0, &term) < 0)
         goto exit;
