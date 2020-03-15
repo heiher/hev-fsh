@@ -14,6 +14,8 @@
 #include "hev-fsh-client-base.h"
 #include "hev-fsh-session-manager.h"
 
+#define HEV_FSH_CLIENT_PORT_LISTEN(p) ((HevFshClientPortListen *)p)
+
 typedef struct _HevFshClientPortListen HevFshClientPortListen;
 
 HevFshClientBase *hev_fsh_client_port_listen_new (HevFshConfig *config,
