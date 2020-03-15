@@ -100,13 +100,13 @@ hev_fsh_server_new (HevFshConfig *config)
         goto exit_free;
     }
 
-    self->task_event = hev_task_new (8192);
+    self->task_event = hev_task_new (HEV_FSH_CONFIG_TASK_STACK_SIZE);
     if (!self->task_event) {
         fprintf (stderr, "Create event's task failed!\n");
         goto exit_free_session_manager;
     }
 
-    self->task_worker = hev_task_new (8192);
+    self->task_worker = hev_task_new (HEV_FSH_CONFIG_TASK_STACK_SIZE);
     if (!self->task_worker) {
         fprintf (stderr, "Create server's task failed!\n");
         goto exit_free_task_event;
