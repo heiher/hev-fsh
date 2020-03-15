@@ -15,6 +15,8 @@
 #include "hev-fsh-client-base.h"
 #include "hev-fsh-session-manager.h"
 
+#define HEV_FSH_CLIENT_ACCEPT(p) ((HevFshClientAccept *)p)
+
 typedef struct _HevFshClientAccept HevFshClientAccept;
 typedef void (*HevFshClientAcceptDestroy) (HevFshClientAccept *self);
 
