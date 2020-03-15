@@ -19,11 +19,11 @@
 #include <hev-task-io-socket.h>
 #include <hev-memory-allocator.h>
 
+#include "hev-fsh-config.h"
 #include "hev-fsh-protocol.h"
 
 #include "hev-fsh-server-session.h"
 
-#define TASK_STACK_SIZE (8192)
 #define fsh_task_io_yielder hev_fsh_session_task_io_yielder
 
 enum
@@ -85,7 +85,7 @@ hev_fsh_server_session_new (int client_fd, HevFshSessionNotify notify,
     self->notify_data = notify_data;
     self->base.hp = HEV_FSH_SESSION_HP;
 
-    task = hev_task_new (TASK_STACK_SIZE);
+    task = hev_task_new (HEV_FSH_CONFIG_TASK_STACK_SIZE);
     if (!task)
         goto exit_free;
 
