@@ -13,6 +13,8 @@
 #include "hev-fsh-client-accept.h"
 #include "hev-fsh-session-manager.h"
 
+#define HEV_FSH_CLIENT_PORT_ACCEPT(p) ((HevFshClientPortAccept *)p)
+
 typedef struct _HevFshClientPortAccept HevFshClientPortAccept;
 
 HevFshClientBase *hev_fsh_client_port_accept_new (HevFshConfig *config,

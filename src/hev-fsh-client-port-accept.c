@@ -8,12 +8,10 @@
  */
 
 #include <stdio.h>
-#include <errno.h>
 #include <string.h>
 #include <unistd.h>
 #include <sys/types.h>
 #include <arpa/inet.h>
-#include <netinet/in.h>
 
 #include <hev-task.h>
 #include <hev-task-io.h>
@@ -45,15 +43,13 @@ hev_fsh_client_port_accept_new (HevFshConfig *config, HevFshToken token,
         goto exit;
     }
 
-    if (hev_fsh_client_accept_construct (&self->base, config, token, sm) < 0) {
+    if (hev_fsh_client_accept_construct (&self->base, config, token, sm) < 0)
         goto exit_free;
-    }
 
-    self->base._destroy = hev_fsh_client_port_accept_destroy;
-
-    s = (HevFshSession *)self;
+    s = HEV_FSH_SESSION (self);
     hev_task_run (s->task, hev_fsh_client_port_accept_task_entry, self);
 
+    self->base._destroy = hev_fsh_client_port_accept_destroy;
     return &self->base.base;
 
 exit_free:
@@ -71,42 +67,40 @@ hev_fsh_client_port_accept_destroy (HevFshClientAccept *base)
 static void
 hev_fsh_client_port_accept_task_entry (void *data)
 {
-    HevTask *task = hev_task_self ();
-    HevFshClientPortAccept *self = data;
-    HevFshMessagePortInfo message_port_info;
-    int rfd, lfd;
+    HevFshClientPortAccept *self = HEV_FSH_CLIENT_PORT_ACCEPT (data);
+    HevFshMessagePortInfo msg_pinfo;
     struct sockaddr_in addr;
+    int rfd, lfd;
 
     rfd = self->base.base.fd;
     if (hev_fsh_client_accept_send_accept (&self->base) < 0)
         goto quit;
 
     /* recv message port info */
-    if (hev_task_io_socket_recv (rfd, &message_port_info,
-                                 sizeof (message_port_info), MSG_WAITALL,
-                                 fsh_task_io_yielder, self) <= 0)
+    if (hev_task_io_socket_recv (rfd, &msg_pinfo, sizeof (msg_pinfo),
+                                 MSG_WAITALL, fsh_task_io_yielder, self) <= 0)
         goto quit;
 
-    if (!hev_fsh_config_addr_list_contains (
-            self->base.base.config, message_port_info.type,
-            message_port_info.addr, message_port_info.port))
+    if (!hev_fsh_config_addr_list_contains (self->base.base.config,
+                                            msg_pinfo.type, msg_pinfo.addr,
+                                            msg_pinfo.port))
         goto quit;
 
-    switch (message_port_info.type) {
+    switch (msg_pinfo.type) {
     case 4:
         addr.sin_family = AF_INET;
-        memcpy (&addr.sin_addr, message_port_info.addr, 4);
+        memcpy (&addr.sin_addr, msg_pinfo.addr, 4);
         break;
     default:
         goto quit;
     }
-    addr.sin_port = message_port_info.port;
+    addr.sin_port = msg_pinfo.port;
 
-    lfd = hev_task_io_socket_socket (AF_INET, SOCK_STREAM, 0);
+    lfd = hev_task_io_socket_socket (AF_INET, SOCK_STREAM, IPPROTO_TCP);
     if (lfd < 0)
         goto quit;
 
-    hev_task_add_fd (task, lfd, POLLIN | POLLOUT);
+    hev_task_add_fd (hev_task_self (), lfd, POLLIN | POLLOUT);
 
     if (hev_task_io_socket_connect (lfd, (struct sockaddr *)&addr,
                                     sizeof (addr), fsh_task_io_yielder,
