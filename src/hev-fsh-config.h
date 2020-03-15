@@ -10,6 +10,8 @@
 #ifndef __HEV_FSH_CONFIG_H__
 #define __HEV_FSH_CONFIG_H__
 
+#define HEV_FSH_CONFIG_TASK_STACK_SIZE (4076)
+
 typedef struct _HevFshConfig HevFshConfig;
 typedef enum _HevFshConfigMode HevFshConfigMode;
 
