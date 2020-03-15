@@ -18,9 +18,20 @@
 
 #include <hev-task.h>
 #include <hev-task-io.h>
+#include <hev-task-call.h>
 #include <hev-task-io-socket.h>
 
 #include "hev-fsh-client-base.h"
+
+typedef struct _HevTaskCallResolv HevTaskCallResolv;
+
+struct _HevTaskCallResolv
+{
+    HevTaskCall base;
+
+    HevFshConfig *config;
+    struct sockaddr *addr;
+};
 
 static int
 hev_fsh_client_base_socket (void)
@@ -77,17 +88,18 @@ hev_fsh_client_base_destroy (HevFshClientBase *self)
         self->_destroy (self);
 }
 
-int
-hev_fsh_client_base_resolv (HevFshClientBase *self, struct sockaddr *_addr)
+static void
+resolv_entry (HevTaskCall *call)
 {
+    HevTaskCallResolv *resolv = (HevTaskCallResolv *)call;
     struct sockaddr_in *address;
     const char *addr;
     int port;
 
-    addr = hev_fsh_config_get_server_address (self->config);
-    port = hev_fsh_config_get_server_port (self->config);
+    addr = hev_fsh_config_get_server_address (resolv->config);
+    port = hev_fsh_config_get_server_port (resolv->config);
 
-    address = (struct sockaddr_in *)_addr;
+    address = (struct sockaddr_in *)resolv->addr;
     address->sin_family = AF_INET;
     address->sin_addr.s_addr = inet_addr (addr);
     address->sin_port = htons (port);
@@ -96,12 +108,36 @@ hev_fsh_client_base_resolv (HevFshClientBase *self, struct sockaddr *_addr)
         struct hostent *h;
 
         h = gethostbyname (addr);
-        if (!h)
-            return -1;
+        if (!h) {
+            hev_task_call_set_retval (call, NULL);
+            return;
+        }
 
         address->sin_family = h->h_addrtype;
         address->sin_addr.s_addr = *(in_addr_t *)h->h_addr;
     }
 
-    return 0;
+    hev_task_call_set_retval (call, address);
+}
+
+int
+hev_fsh_client_base_resolv (HevFshClientBase *self, struct sockaddr *addr)
+{
+    HevTaskCall *call;
+    HevTaskCallResolv *resolv;
+    int ret = -1;
+
+    call = hev_task_call_new (sizeof (HevTaskCallResolv), 16384);
+    if (!call)
+        return ret;
+
+    resolv = (HevTaskCallResolv *)call;
+    resolv->config = self->config;
+    resolv->addr = addr;
+
+    if (hev_task_call_jump (call, resolv_entry))
+        ret = 0;
+
+    hev_task_call_destroy (call);
+    return ret;
 }
