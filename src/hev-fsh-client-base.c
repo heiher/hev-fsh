@@ -14,7 +14,6 @@
 #include <string.h>
 #include <signal.h>
 #include <arpa/inet.h>
-#include <netinet/in.h>
 
 #include <hev-task.h>
 #include <hev-task-io.h>
@@ -38,7 +37,7 @@ hev_fsh_client_base_socket (void)
 {
     int fd, flags;
 
-    fd = hev_task_io_socket_socket (AF_INET, SOCK_STREAM, 0);
+    fd = hev_task_io_socket_socket (AF_INET, SOCK_STREAM, IPPROTO_TCP);
     if (fd < 0)
         goto exit;
 
@@ -92,19 +91,19 @@ static void
 resolv_entry (HevTaskCall *call)
 {
     HevTaskCallResolv *resolv = (HevTaskCallResolv *)call;
-    struct sockaddr_in *address;
+    struct sockaddr_in *saddr;
     const char *addr;
     int port;
 
     addr = hev_fsh_config_get_server_address (resolv->config);
     port = hev_fsh_config_get_server_port (resolv->config);
 
-    address = (struct sockaddr_in *)resolv->addr;
-    address->sin_family = AF_INET;
-    address->sin_addr.s_addr = inet_addr (addr);
-    address->sin_port = htons (port);
+    saddr = (struct sockaddr_in *)resolv->addr;
+    saddr->sin_family = AF_INET;
+    saddr->sin_addr.s_addr = inet_addr (addr);
+    saddr->sin_port = htons (port);
 
-    if (address->sin_addr.s_addr == INADDR_NONE) {
+    if (saddr->sin_addr.s_addr == INADDR_NONE) {
         struct hostent *h;
 
         h = gethostbyname (addr);
@@ -113,11 +112,11 @@ resolv_entry (HevTaskCall *call)
             return;
         }
 
-        address->sin_family = h->h_addrtype;
-        address->sin_addr.s_addr = *(in_addr_t *)h->h_addr;
+        saddr->sin_family = h->h_addrtype;
+        saddr->sin_addr.s_addr = *(in_addr_t *)h->h_addr;
     }
 
-    hev_task_call_set_retval (call, address);
+    hev_task_call_set_retval (call, saddr);
 }
 
 int
