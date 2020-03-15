@@ -2,7 +2,7 @@
  ============================================================================
  Name        : hev-fsh-server-session.h
  Author      : Heiher <r@hev.cc>
- Copyright   : Copyright (c) 2017 - 2019 everyone.
+ Copyright   : Copyright (c) 2017 - 2020 everyone.
  Description : Fsh server session
  ============================================================================
  */
@@ -11,6 +11,8 @@
 #define __HEV_FSH_SERVER_SESSION_H__
 
 #include "hev-fsh-session.h"
+
+#define HEV_FSH_SERVER_SESSION(p) ((HevFshServerSession *)p)
 
 typedef struct _HevFshServerSession HevFshServerSession;
 
