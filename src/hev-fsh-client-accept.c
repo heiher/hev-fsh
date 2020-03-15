@@ -18,7 +18,6 @@
 
 #include "hev-fsh-client-accept.h"
 
-#define TASK_STACK_SIZE (16384)
 #define fsh_task_io_yielder hev_fsh_session_task_io_yielder
 
 static void hev_fsh_client_accept_destroy (HevFshClientBase *base);
@@ -34,7 +33,7 @@ hev_fsh_client_accept_construct (HevFshClientAccept *self, HevFshConfig *config,
         goto exit;
     }
 
-    s->task = hev_task_new (TASK_STACK_SIZE);
+    s->task = hev_task_new (HEV_FSH_CONFIG_TASK_STACK_SIZE);
     if (!s->task) {
         fprintf (stderr, "Create client accept's task failed!\n");
         goto exit_free;
