@@ -14,6 +14,8 @@
 
 #define HEV_FSH_SESSION_HP (10)
 
+#define HEV_FSH_SESSION(p) ((HevFshSession *)p)
+
 typedef struct _HevFshSession HevFshSession;
 typedef void (*HevFshSessionNotify) (HevFshSession *self, void *data);
 
