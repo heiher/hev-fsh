@@ -24,8 +24,6 @@
 
 #include "hev-fsh-client-port-listen.h"
 
-#define TASK_STACK_SIZE (8192)
-
 struct _HevFshClientPortListen
 {
     HevFshClientBase base;
@@ -79,7 +77,7 @@ hev_fsh_client_port_listen_new (HevFshConfig *config, HevFshSessionManager *sm)
     }
 
     s = (HevFshSession *)self;
-    s->task = hev_task_new (TASK_STACK_SIZE);
+    s->task = hev_task_new (HEV_FSH_CONFIG_TASK_STACK_SIZE);
     if (!s->task) {
         fprintf (stderr, "Create client port's task failed!\n");
         goto exit_free_base;
