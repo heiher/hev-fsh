@@ -14,6 +14,8 @@
 #include "hev-fsh-client-base.h"
 #include "hev-fsh-session-manager.h"
 
+#define HEV_FSH_CLIENT_FORWARD(p) ((HevFshClientForward *)p)
+
 typedef struct _HevFshClientForward HevFshClientForward;
 
 HevFshClientBase *hev_fsh_client_forward_new (HevFshConfig *config,
