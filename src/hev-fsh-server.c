@@ -2,17 +2,15 @@
  ============================================================================
  Name        : hev-fsh-server.c
  Author      : Heiher <r@hev.cc>
- Copyright   : Copyright (c) 2017 - 2019 everyone.
+ Copyright   : Copyright (c) 2017 - 2020 everyone.
  Description : Fsh server
  ============================================================================
  */
 
-#include <stdio.h>
 #include <errno.h>
+#include <stdio.h>
 #include <string.h>
 #include <unistd.h>
-#include <sys/socket.h>
-#include <netinet/in.h>
 #include <arpa/inet.h>
 
 #include <hev-task.h>
@@ -44,41 +42,41 @@ static void hev_fsh_server_start (HevFshBase *base);
 static void hev_fsh_server_stop (HevFshBase *base);
 static void hev_fsh_server_event_task_entry (void *data);
 static void hev_fsh_server_worker_task_entry (void *data);
-static void session_close_handler (HevFshSession *s, void *data);
+static void fsh_session_close_handler (HevFshSession *s, void *data);
 
 HevFshBase *
 hev_fsh_server_new (HevFshConfig *config)
 {
     HevFshServer *self;
-    int fd, port, reuseaddr = 1;
-    struct sockaddr_in address;
+    struct sockaddr_in saddr;
+    int fd, port, reuse = 1;
     unsigned int timeout;
     const char *addr;
 
-    fd = hev_task_io_socket_socket (AF_INET, SOCK_STREAM, 0);
+    addr = hev_fsh_config_get_server_address (config);
+    port = hev_fsh_config_get_server_port (config);
+    timeout = hev_fsh_config_get_timeout (config);
+    saddr.sin_family = AF_INET;
+    saddr.sin_addr.s_addr = inet_addr (addr);
+    saddr.sin_port = htons (port);
+
+    fd = hev_task_io_socket_socket (AF_INET, SOCK_STREAM, IPPROTO_TCP);
     if (fd < 0) {
         fprintf (stderr, "Create socket failed!\n");
         goto exit;
     }
 
-    if (setsockopt (fd, SOL_SOCKET, SO_REUSEADDR, &reuseaddr,
-                    sizeof (reuseaddr)) < 0) {
+    if (setsockopt (fd, SOL_SOCKET, SO_REUSEADDR, &reuse, sizeof (int)) < 0) {
         fprintf (stderr, "Set reuse address failed!\n");
         goto exit_close;
     }
 
-    addr = hev_fsh_config_get_server_address (config);
-    port = hev_fsh_config_get_server_port (config);
-    address.sin_family = AF_INET;
-    address.sin_addr.s_addr = inet_addr (addr);
-    address.sin_port = htons (port);
-
-    if (bind (fd, (struct sockaddr *)&address, sizeof (address)) < 0) {
+    if (bind (fd, (struct sockaddr *)&saddr, sizeof (saddr)) < 0) {
         fprintf (stderr, "Bind address failed!\n");
         goto exit_close;
     }
 
-    if (listen (fd, 100) < 0) {
+    if (listen (fd, 10) < 0) {
         fprintf (stderr, "Listen failed!\n");
         goto exit_close;
     }
@@ -89,11 +87,6 @@ hev_fsh_server_new (HevFshConfig *config)
         goto exit_close;
     }
 
-    self->fd = fd;
-    self->event_fds[0] = -1;
-    self->event_fds[1] = -1;
-
-    timeout = hev_fsh_config_get_timeout (config);
     self->session_manager = hev_fsh_session_manager_new (timeout, 0);
     if (!self->session_manager) {
         fprintf (stderr, "Create session manager failed!\n");
@@ -112,10 +105,12 @@ hev_fsh_server_new (HevFshConfig *config)
         goto exit_free_task_event;
     }
 
+    self->fd = fd;
+    self->event_fds[0] = -1;
+    self->event_fds[1] = -1;
     self->base._destroy = hev_fsh_server_destroy;
     self->base._start = hev_fsh_server_start;
     self->base._stop = hev_fsh_server_stop;
-
     return &self->base;
 
 exit_free_task_event:
@@ -133,23 +128,26 @@ exit:
 static void
 hev_fsh_server_destroy (HevFshBase *base)
 {
-    HevFshServer *self = (HevFshServer *)base;
+    HevFshServer *self = HEV_FSH_SERVER (base);
 
-    close (self->fd);
     hev_task_unref (self->task_event);
     hev_task_unref (self->task_worker);
     hev_fsh_session_manager_destroy (self->session_manager);
+
+    close (self->fd);
     hev_free (self);
 }
 
 static void
 hev_fsh_server_start (HevFshBase *base)
 {
-    HevFshServer *self = (HevFshServer *)base;
+    HevFshServer *self = HEV_FSH_SERVER (base);
 
     hev_fsh_session_manager_start (self->session_manager);
+
     hev_task_ref (self->task_event);
     hev_task_run (self->task_event, hev_fsh_server_event_task_entry, self);
+
     hev_task_ref (self->task_worker);
     hev_task_run (self->task_worker, hev_fsh_server_worker_task_entry, self);
 }
@@ -157,7 +155,7 @@ hev_fsh_server_start (HevFshBase *base)
 static void
 hev_fsh_server_stop (HevFshBase *base)
 {
-    HevFshServer *self = (HevFshServer *)base;
+    HevFshServer *self = HEV_FSH_SERVER (base);
     int val;
 
     if (self->event_fds[1] < 0)
@@ -170,7 +168,7 @@ hev_fsh_server_stop (HevFshBase *base)
 static int
 fsh_task_io_yielder (HevTaskYieldType type, void *data)
 {
-    HevFshServer *self = data;
+    HevFshServer *self = HEV_FSH_SERVER (data);
 
     hev_task_yield (type);
 
@@ -180,8 +178,7 @@ fsh_task_io_yielder (HevTaskYieldType type, void *data)
 static void
 hev_fsh_server_event_task_entry (void *data)
 {
-    HevFshServer *self = data;
-    HevTask *task = hev_task_self ();
+    HevFshServer *self = HEV_FSH_SERVER (data);
     int val;
 
     if (hev_task_io_pipe_pipe (self->event_fds) < 0) {
@@ -189,7 +186,7 @@ hev_fsh_server_event_task_entry (void *data)
         return;
     }
 
-    hev_task_add_fd (task, self->event_fds[0], POLLIN);
+    hev_task_add_fd (hev_task_self (), self->event_fds[0], POLLIN);
     hev_task_io_read (self->event_fds[0], &val, sizeof (val), NULL, NULL);
 
     self->quit = 1;
@@ -203,41 +200,40 @@ hev_fsh_server_event_task_entry (void *data)
 static void
 hev_fsh_server_worker_task_entry (void *data)
 {
-    HevFshServer *self = data;
-    HevTask *task = hev_task_self ();
+    HevFshServer *self = HEV_FSH_SERVER (data);
 
-    hev_task_add_fd (task, self->fd, POLLIN);
+    hev_task_add_fd (hev_task_self (), self->fd, POLLIN);
 
     for (;;) {
-        int fd;
         HevFshServerSession *ss;
         HevFshSession *s;
+        int fd;
 
         fd = hev_task_io_socket_accept (self->fd, NULL, NULL,
                                         fsh_task_io_yielder, self);
-        if (-2 == fd) {
+        if (fd == -2) {
             break;
         } else if (fd < 0) {
             fprintf (stderr, "Accept failed!\n");
             continue;
         }
 
-        ss = hev_fsh_server_session_new (fd, session_close_handler, self);
+        ss = hev_fsh_server_session_new (fd, fsh_session_close_handler, self);
         if (!ss) {
             close (fd);
             continue;
         }
 
-        s = (HevFshSession *)ss;
+        s = HEV_FSH_SESSION (ss);
         hev_fsh_session_manager_insert (self->session_manager, s);
         hev_fsh_server_session_run (ss);
     }
 }
 
 static void
-session_close_handler (HevFshSession *s, void *data)
+fsh_session_close_handler (HevFshSession *s, void *data)
 {
-    HevFshServer *self = data;
+    HevFshServer *self = HEV_FSH_SERVER (data);
 
     hev_fsh_session_manager_remove (self->session_manager, s);
 }

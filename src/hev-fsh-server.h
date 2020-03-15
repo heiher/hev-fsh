@@ -2,7 +2,7 @@
  ============================================================================
  Name        : hev-fsh-server.h
  Author      : Heiher <r@hev.cc>
- Copyright   : Copyright (c) 2017 - 2019 everyone.
+ Copyright   : Copyright (c) 2017 - 2020 everyone.
  Description : Fsh server
  ============================================================================
  */
@@ -12,6 +12,8 @@
 
 #include "hev-fsh-base.h"
 #include "hev-fsh-config.h"
+
+#define HEV_FSH_SERVER(p) ((HevFshServer *)p)
 
 typedef struct _HevFshServer HevFshServer;
 
