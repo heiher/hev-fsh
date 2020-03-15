@@ -13,6 +13,8 @@
 #include "hev-fsh-client-connect.h"
 #include "hev-fsh-session-manager.h"
 
+#define HEV_FSH_CLIENT_PORT_CONNECT(p) ((HevFshClientPortConnect *)p)
+
 typedef struct _HevFshClientPortConnect HevFshClientPortConnect;
 
 HevFshClientBase *hev_fsh_client_port_connect_new (HevFshConfig *config,

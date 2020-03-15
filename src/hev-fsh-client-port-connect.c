@@ -7,13 +7,12 @@
  ============================================================================
  */
 
-#include <stdio.h>
 #include <fcntl.h>
+#include <stdio.h>
 #include <string.h>
 #include <unistd.h>
 #include <sys/types.h>
 #include <arpa/inet.h>
-#include <netinet/in.h>
 
 #include <hev-task.h>
 #include <hev-task-io.h>
@@ -54,12 +53,11 @@ hev_fsh_client_port_connect_new (HevFshConfig *config, int local_fd,
         goto exit_free;
     }
 
-    self->local_fd = local_fd;
-    self->base._destroy = hev_fsh_client_port_connect_destroy;
-
-    s = (HevFshSession *)self;
+    s = HEV_FSH_SESSION (self);
     hev_task_run (s->task, hev_fsh_client_port_connect_task_entry, self);
 
+    self->local_fd = local_fd;
+    self->base._destroy = hev_fsh_client_port_connect_destroy;
     return &self->base.base;
 
 exit_free:
@@ -71,7 +69,7 @@ exit:
 static void
 hev_fsh_client_port_connect_destroy (HevFshClientConnect *base)
 {
-    HevFshClientPortConnect *self = (HevFshClientPortConnect *)base;
+    HevFshClientPortConnect *self = HEV_FSH_CLIENT_PORT_CONNECT (base);
 
     if (self->local_fd >= 0)
         close (self->local_fd);
@@ -81,29 +79,25 @@ hev_fsh_client_port_connect_destroy (HevFshClientConnect *base)
 static void
 hev_fsh_client_port_connect_task_entry (void *data)
 {
+    HevFshClientPortConnect *self = HEV_FSH_CLIENT_PORT_CONNECT (data);
+    HevFshClientBase *base = HEV_FSH_CLIENT_BASE (self);
     HevTask *task = hev_task_self ();
-    HevFshClientPortConnect *self = data;
-    HevFshMessagePortInfo message_port_info;
-    const char *address;
-    unsigned int port;
-    int ifd, ofd;
-    ssize_t len;
+    HevFshMessagePortInfo msg_pinfo;
+    int ifd, ofd, port;
+    const char *addr;
 
     if (hev_fsh_client_connect_send_connect (&self->base) < 0)
         goto exit;
 
-    address = hev_fsh_config_get_remote_address (self->base.base.config);
-    port = hev_fsh_config_get_remote_port (self->base.base.config);
-
-    message_port_info.type = 4;
-    message_port_info.port = htons (port);
-    inet_aton (address, (struct in_addr *)&message_port_info.addr);
+    addr = hev_fsh_config_get_remote_address (base->config);
+    port = hev_fsh_config_get_remote_port (base->config);
+    msg_pinfo.type = 4;
+    msg_pinfo.port = htons (port);
+    inet_aton (addr, (struct in_addr *)&msg_pinfo.addr);
 
     /* send message port info */
-    len = hev_task_io_socket_send (self->base.base.fd, &message_port_info,
-                                   sizeof (message_port_info), MSG_WAITALL,
-                                   fsh_task_io_yielder, self);
-    if (len <= 0)
+    if (hev_task_io_socket_send (base->fd, &msg_pinfo, sizeof (msg_pinfo),
+                                 MSG_WAITALL, fsh_task_io_yielder, self) <= 0)
         goto exit;
 
     if (self->local_fd < 0) {
@@ -127,9 +121,9 @@ hev_fsh_client_port_connect_task_entry (void *data)
         hev_task_add_fd (task, ifd, POLLIN | POLLOUT);
     }
 
-    hev_task_io_splice (self->base.base.fd, self->base.base.fd, ifd, ofd, 8192,
-                        fsh_task_io_yielder, self);
+    hev_task_io_splice (base->fd, base->fd, ifd, ofd, 8192, fsh_task_io_yielder,
+                        self);
 
 exit:
-    hev_fsh_client_base_destroy (&self->base.base);
+    hev_fsh_client_base_destroy (base);
 }
