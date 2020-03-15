@@ -13,6 +13,8 @@
 #include "hev-fsh-base.h"
 #include "hev-fsh-config.h"
 
+#define HEV_FSH_CLIENT(p) ((HevFshClient *)p)
+
 typedef struct _HevFshClient HevFshClient;
 
 HevFshBase *hev_fsh_client_new (HevFshConfig *config);
