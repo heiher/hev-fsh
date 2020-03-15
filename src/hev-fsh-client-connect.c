@@ -11,7 +11,6 @@
 #include <string.h>
 #include <unistd.h>
 #include <sys/types.h>
-#include <netinet/in.h>
 
 #include <hev-task.h>
 #include <hev-task-io.h>
@@ -31,7 +30,7 @@ hev_fsh_client_connect_construct (HevFshClientConnect *self,
                                   HevFshConfig *config,
                                   HevFshSessionManager *sm)
 {
-    HevFshSession *s = (HevFshSession *)self;
+    HevFshSession *s = HEV_FSH_SESSION (self);
 
     if (hev_fsh_client_base_construct (&self->base, config, sm) < 0) {
         fprintf (stderr, "Construct client base failed!\n");
@@ -45,7 +44,6 @@ hev_fsh_client_connect_construct (HevFshClientConnect *self,
     }
 
     self->base._destroy = hev_fsh_client_connect_destroy;
-
     return 0;
 
 exit_free:
@@ -57,7 +55,7 @@ exit:
 static void
 hev_fsh_client_connect_destroy (HevFshClientBase *base)
 {
-    HevFshClientConnect *self = (HevFshClientConnect *)base;
+    HevFshClientConnect *self = HEV_FSH_CLIENT_CONNECT (base);
 
     if (self->_destroy)
         self->_destroy (self);
@@ -66,45 +64,41 @@ hev_fsh_client_connect_destroy (HevFshClientBase *base)
 int
 hev_fsh_client_connect_send_connect (HevFshClientConnect *self)
 {
-    HevTask *task = hev_task_self ();
-    HevFshMessage message;
-    HevFshMessageToken message_token;
-    struct sockaddr_in address;
+    HevFshMessage msg;
+    HevFshMessageToken msg_token;
+    struct sockaddr_in saddr;
     struct sockaddr *addr;
     const char *token;
-    ssize_t len;
 
-    hev_task_add_fd (task, self->base.fd, POLLIN | POLLOUT);
+    hev_task_add_fd (hev_task_self (), self->base.fd, POLLIN | POLLOUT);
 
-    addr = (struct sockaddr *)&address;
+    msg.ver = 1;
+    msg.cmd = HEV_FSH_CMD_CONNECT;
+    addr = (struct sockaddr *)&saddr;
+    token = hev_fsh_config_get_token (self->base.config);
+
     if (hev_fsh_client_base_resolv (&self->base, addr) < 0) {
         fprintf (stderr, "Resolv server address failed!\n");
         return -1;
     }
 
-    if (hev_task_io_socket_connect (self->base.fd, addr, sizeof (address),
+    if (hev_task_io_socket_connect (self->base.fd, addr, sizeof (saddr),
                                     fsh_task_io_yielder, self) < 0) {
         fprintf (stderr, "Connect to server failed!\n");
         return -1;
     }
 
-    message.ver = 1;
-    message.cmd = HEV_FSH_CMD_CONNECT;
-    len = hev_task_io_socket_send (self->base.fd, &message, sizeof (message),
-                                   MSG_WAITALL, fsh_task_io_yielder, self);
-    if (len <= 0)
+    if (hev_task_io_socket_send (self->base.fd, &msg, sizeof (msg), MSG_WAITALL,
+                                 fsh_task_io_yielder, self) <= 0)
         return -1;
 
-    token = hev_fsh_config_get_token (self->base.config);
-    if (hev_fsh_protocol_token_from_string (message_token.token, token) == -1) {
+    if (hev_fsh_protocol_token_from_string (msg_token.token, token) == -1) {
         fprintf (stderr, "Can't parse token!\n");
         return -1;
     }
 
-    len = hev_task_io_socket_send (self->base.fd, &message_token,
-                                   sizeof (message_token), MSG_WAITALL,
-                                   fsh_task_io_yielder, self);
-    if (len <= 0)
+    if (hev_task_io_socket_send (self->base.fd, &msg_token, sizeof (msg_token),
+                                 MSG_WAITALL, fsh_task_io_yielder, self) <= 0)
         return -1;
 
     return 0;

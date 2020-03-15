@@ -14,6 +14,8 @@
 #include "hev-fsh-client-base.h"
 #include "hev-fsh-session-manager.h"
 
+#define HEV_FSH_CLIENT_CONNECT(p) ((HevFshClientConnect *)p)
+
 typedef struct _HevFshClientConnect HevFshClientConnect;
 typedef void (*HevFshClientConnectDestroy) (HevFshClientConnect *self);
 
