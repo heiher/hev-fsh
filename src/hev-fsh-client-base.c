@@ -103,8 +103,12 @@ resolv_entry (HevTaskCall *call)
     saddr = (struct sockaddr_in6 *)resolv->addr;
     if (hev_fsh_parse_sockaddr (saddr, addr, port) == 0) {
         struct hostent *h;
+        int type = AF_INET;
 
-        h = gethostbyname (addr);
+        if (hev_fsh_config_get_ip_type (resolv->config) == 6)
+            type = AF_INET6;
+
+        h = gethostbyname2 (addr, type);
         if (!h) {
             hev_task_call_set_retval (call, NULL);
             return;
