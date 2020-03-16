@@ -32,7 +32,7 @@ static void
 show_help (void)
 {
     fprintf (stderr,
-             "Common: [-t TIMEOUT]\n"
+             "Common: [-4 | -6] [-t TIMEOUT]\n"
              "Server: -s [-l LOG] [SERVER_ADDR:SERVER_PORT]\n"
              "Terminal:\n"
              "  Forwarder: -f [-u USER] SERVER_ADDR[:SERVER_PORT/TOKEN]\n"
@@ -371,8 +371,14 @@ parse_args (HevFshConfig *config, int argc, char *argv[])
     const char *t1 = NULL;
     const char *t2 = NULL;
 
-    while ((opt = getopt (argc, argv, "t:sfpl:u:w:b:")) != -1) {
+    while ((opt = getopt (argc, argv, "46t:sfpl:u:w:b:")) != -1) {
         switch (opt) {
+        case '4':
+            hev_fsh_config_set_ip_type (config, 4);
+            break;
+        case '6':
+            hev_fsh_config_set_ip_type (config, 6);
+            break;
         case 't':
             hev_fsh_config_set_timeout (config, strtoul (optarg, NULL, 10));
             break;
