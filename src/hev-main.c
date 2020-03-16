@@ -457,9 +457,9 @@ setup_log (int mode, const char *log)
 int
 hev_fsh_parse_sockaddr (struct sockaddr_in6 *saddr, const char *addr, int port)
 {
+    __builtin_bzero (saddr, sizeof (*saddr));
     saddr->sin6_family = AF_INET6;
     saddr->sin6_port = htons (port);
-    memset (&saddr->sin6_addr, 0, sizeof (saddr->sin6_addr));
 
     if (inet_pton (AF_INET, addr, &saddr->sin6_addr.s6_addr[12]) == 1) {
         ((uint16_t *)&saddr->sin6_addr)[5] = 0xffff;
