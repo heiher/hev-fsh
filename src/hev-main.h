@@ -14,7 +14,7 @@
 
 #define MAJOR_VERSION (4)
 #define MINOR_VERSION (2)
-#define MICRO_VERSION (0)
+#define MICRO_VERSION (1)
 
 int hev_fsh_parse_sockaddr (struct sockaddr_in6 *saddr, const char *addr,
                             int port);
