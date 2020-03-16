@@ -62,7 +62,7 @@ hev_fsh_client_accept_send_accept (HevFshClientAccept *self)
 {
     HevFshMessage msg;
     HevFshMessageToken msg_token;
-    struct sockaddr_in saddr;
+    struct sockaddr_in6 saddr;
     struct sockaddr *addr;
     struct iovec iov[2];
     struct msghdr mh;
