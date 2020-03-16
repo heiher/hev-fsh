@@ -69,7 +69,7 @@ hev_fsh_client_port_accept_task_entry (void *data)
 {
     HevFshClientPortAccept *self = HEV_FSH_CLIENT_PORT_ACCEPT (data);
     HevFshMessagePortInfo msg_pinfo;
-    struct sockaddr_in addr;
+    struct sockaddr_in6 addr;
     int rfd, lfd;
 
     rfd = self->base.base.fd;
@@ -86,17 +86,23 @@ hev_fsh_client_port_accept_task_entry (void *data)
                                             msg_pinfo.port))
         goto quit;
 
+    addr.sin6_family = AF_INET6;
+    addr.sin6_port = msg_pinfo.port;
+    memset (&addr.sin6_addr, 0, sizeof (addr.sin6_addr));
+
     switch (msg_pinfo.type) {
     case 4:
-        addr.sin_family = AF_INET;
-        memcpy (&addr.sin_addr, msg_pinfo.addr, 4);
+        memcpy (&addr.sin6_addr.s6_addr[12], msg_pinfo.addr, 4);
+        ((uint16_t *)&addr.sin6_addr)[5] = 0xffff;
+        break;
+    case 6:
+        memcpy (&addr.sin6_addr, msg_pinfo.addr, 16);
         break;
     default:
         goto quit;
     }
-    addr.sin_port = msg_pinfo.port;
 
-    lfd = hev_task_io_socket_socket (AF_INET, SOCK_STREAM, IPPROTO_TCP);
+    lfd = hev_task_io_socket_socket (AF_INET6, SOCK_STREAM, IPPROTO_TCP);
     if (lfd < 0)
         goto quit;
 
