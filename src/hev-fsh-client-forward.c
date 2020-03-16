@@ -174,7 +174,7 @@ static void
 hev_fsh_client_forward_task_entry (void *data)
 {
     HevFshClientForward *self = HEV_FSH_CLIENT_FORWARD (data);
-    struct sockaddr_in saddr;
+    struct sockaddr_in6 saddr;
     struct sockaddr *addr;
     int keep_alive = 0;
 
