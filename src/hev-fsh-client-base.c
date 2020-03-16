@@ -20,6 +20,8 @@
 #include <hev-task-call.h>
 #include <hev-task-io-socket.h>
 
+#include "hev-main.h"
+
 #include "hev-fsh-client-base.h"
 
 typedef struct _HevTaskCallResolv HevTaskCallResolv;
@@ -37,7 +39,7 @@ hev_fsh_client_base_socket (void)
 {
     int fd, flags;
 
-    fd = hev_task_io_socket_socket (AF_INET, SOCK_STREAM, IPPROTO_TCP);
+    fd = hev_task_io_socket_socket (AF_INET6, SOCK_STREAM, IPPROTO_TCP);
     if (fd < 0)
         goto exit;
 
@@ -91,19 +93,15 @@ static void
 resolv_entry (HevTaskCall *call)
 {
     HevTaskCallResolv *resolv = (HevTaskCallResolv *)call;
-    struct sockaddr_in *saddr;
+    struct sockaddr_in6 *saddr;
     const char *addr;
     int port;
 
     addr = hev_fsh_config_get_server_address (resolv->config);
     port = hev_fsh_config_get_server_port (resolv->config);
 
-    saddr = (struct sockaddr_in *)resolv->addr;
-    saddr->sin_family = AF_INET;
-    saddr->sin_addr.s_addr = inet_addr (addr);
-    saddr->sin_port = htons (port);
-
-    if (saddr->sin_addr.s_addr == INADDR_NONE) {
+    saddr = (struct sockaddr_in6 *)resolv->addr;
+    if (hev_fsh_parse_sockaddr (saddr, addr, port) == 0) {
         struct hostent *h;
 
         h = gethostbyname (addr);
@@ -112,8 +110,19 @@ resolv_entry (HevTaskCall *call)
             return;
         }
 
-        saddr->sin_family = h->h_addrtype;
-        saddr->sin_addr.s_addr = *(in_addr_t *)h->h_addr;
+        saddr->sin6_family = AF_INET6;
+        saddr->sin6_port = htons (port);
+        memset (&saddr->sin6_addr, 0, sizeof (saddr->sin6_addr));
+
+        switch (h->h_addrtype) {
+        case AF_INET:
+            memcpy (&saddr->sin6_addr.s6_addr[12], h->h_addr, 4);
+            ((uint16_t *)&saddr->sin6_addr)[5] = 0xffff;
+            break;
+        case AF_INET6:
+            memcpy (&saddr->sin6_addr, h->h_addr, 16);
+            break;
+        }
     }
 
     hev_task_call_set_retval (call, saddr);
