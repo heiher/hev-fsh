@@ -114,9 +114,9 @@ resolv_entry (HevTaskCall *call)
             return;
         }
 
+        __builtin_bzero (saddr, sizeof (*saddr));
         saddr->sin6_family = AF_INET6;
         saddr->sin6_port = htons (port);
-        memset (&saddr->sin6_addr, 0, sizeof (saddr->sin6_addr));
 
         switch (h->h_addrtype) {
         case AF_INET:
