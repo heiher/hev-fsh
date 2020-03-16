@@ -86,9 +86,9 @@ hev_fsh_client_port_accept_task_entry (void *data)
                                             msg_pinfo.port))
         goto quit;
 
+    __builtin_bzero (&addr, sizeof (addr));
     addr.sin6_family = AF_INET6;
     addr.sin6_port = msg_pinfo.port;
-    memset (&addr.sin6_addr, 0, sizeof (addr.sin6_addr));
 
     switch (msg_pinfo.type) {
     case 4:
