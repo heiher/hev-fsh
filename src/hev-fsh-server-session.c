@@ -243,7 +243,7 @@ fsh_server_write_message_token (HevFshServerSession *self)
     iov[1].iov_base = &msg_token;
     iov[1].iov_len = sizeof (msg_token);
 
-    memset (&mh, 0, sizeof (mh));
+    __builtin_bzero (&mh, sizeof (mh));
     mh.msg_iov = iov;
     mh.msg_iovlen = 2;
 
@@ -297,7 +297,7 @@ fsh_server_write_message_connect (HevFshServerSession *self)
     iov[1].iov_base = &msg_token;
     iov[1].iov_len = sizeof (msg_token);
 
-    memset (&mh, 0, sizeof (mh));
+    __builtin_bzero (&mh, sizeof (mh));
     mh.msg_iov = iov;
     mh.msg_iovlen = 2;
 
