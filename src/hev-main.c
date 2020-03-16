@@ -15,6 +15,7 @@
 #include <unistd.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <sys/socket.h>
 #include <arpa/inet.h>
 
 #include <hev-task-system.h>
@@ -47,79 +48,311 @@ show_help (void)
              MICRO_VERSION);
 }
 
-static void
-parse_addr (const char *str, char **addr, char **port, char **token)
+static char *
+parse_addr (const char *str, const char **addr, const char **port,
+            const char **token)
 {
-    char *saveptr = NULL;
+    char *b;
+    int i = 0, s = 0;
 
-    *addr = strtok_r ((char *)str, "/", &saveptr);
-    if (token)
-        *token = strtok_r (NULL, "/", &saveptr);
-    if (*addr) {
-        *addr = strtok_r (*addr, ":", &saveptr);
-        *port = strtok_r (NULL, ":", &saveptr);
-    }
-}
+    b = strdup (str);
+    if (!b)
+        return NULL;
 
-static void
-parse_addr_list (HevFshConfig *config, const char *str, int action)
-{
-    char *saveptr1 = NULL;
-
-    for (;; str = NULL) {
-        char *ap;
-        char *addr;
-        char *port;
-        char *saveptr2 = NULL;
-        struct in_addr iaddr;
-
-        ap = strtok_r ((char *)str, ",", &saveptr1);
-        if (!ap)
+    /* parse state machine */
+    for (;;) {
+        switch (b[i]) {
+        case '\0':
+            goto exit;
+        case ',':
+            b[i] = '\0';
+            goto exit;
+        case ':':
+            if (s != 1 && s != 4 && s != 5 && s != 6)
+                goto error;
+            if (s == 1) {
+                b[i++] = '\0';
+                *port = &b[i];
+                s = 2;
+            } else if (s == 6) {
+                b[i++] = '\0';
+                *port = &b[i];
+                s = 7;
+            } else {
+                s = 5;
+                i++;
+            }
             break;
-
-        addr = strtok_r (ap, ":", &saveptr2);
-        port = strtok_r (NULL, ":", &saveptr2);
-        if (!addr || !port)
-            continue;
-
-        if (!inet_aton (addr, &iaddr))
-            continue;
-
-        hev_fsh_config_addr_list_add (config, 4, &iaddr, htons (atoi (port)),
-                                      action);
+        case '/':
+            if (s != 1 && s != 2 && s != 6 && s != 7)
+                goto error;
+            b[i++] = '\0';
+            if (token)
+                *token = &b[i];
+            break;
+        case '[':
+            if (s != 0)
+                goto error;
+            *addr = &b[++i];
+            s = 4;
+            break;
+        case ']':
+            if (s != 5)
+                goto error;
+            b[i++] = '\0';
+            s = 6;
+            break;
+        default:
+            if (s == 0) {
+                *addr = &b[i++];
+                s = 1;
+            } else if (s == 4) {
+                s = 5;
+            } else {
+                i++;
+            }
+            break;
+        }
     }
+
+exit:
+    return b;
+
+error:
+    free (b);
+    return NULL;
 }
 
 static int
-parse_addr_pair (HevFshConfig *config, const char *str)
+set_addr_list (HevFshConfig *config, const char *str, int action)
 {
-    char *saveptr = NULL;
-    char *v1;
-    char *v2;
-    char *v3;
-    char *v4;
+    const char *addr = NULL;
+    const char *port = NULL;
+    char iaddr[16] = { 0 };
+    int nport;
+    char *b;
 
-    v1 = strtok_r ((char *)str, ":", &saveptr);
-    v2 = strtok_r (NULL, ":", &saveptr);
-    v3 = strtok_r (NULL, ":", &saveptr);
-    v4 = strtok_r (NULL, ":", &saveptr);
+    b = parse_addr (str, &addr, &port, NULL);
+    if (!b || !addr || !port) {
+        free (b);
+        return -1;
+    }
 
-    if (!v1 || !v2)
+    nport = htons (atoi (port));
+    if (inet_pton (AF_INET, addr, &iaddr[12]) == 1) {
+        ((uint16_t *)iaddr)[5] = 0xffff;
+        hev_fsh_config_addr_list_add (config, 4, &iaddr[12], nport, action);
+        hev_fsh_config_addr_list_add (config, 6, iaddr, nport, action);
+    } else {
+        if (inet_pton (AF_INET6, addr, iaddr) != 1) {
+            free (b);
+            return -1;
+        }
+        hev_fsh_config_addr_list_add (config, 6, iaddr, nport, action);
+        if (IN6_IS_ADDR_V4MAPPED ((struct in6_addr *)iaddr))
+            hev_fsh_config_addr_list_add (config, 4, &iaddr[12], nport, action);
+    }
+
+    return 0;
+}
+
+static int
+parse_set_addr_list (HevFshConfig *config, const char *str, int action)
+{
+    int s = 0;
+
+    /* parse state machine */
+    for (;;) {
+        switch (*str) {
+        case '\0':
+            return 0;
+        case ',':
+            str++;
+            s = 0;
+            break;
+        default:
+            if (s == 0) {
+                if (set_addr_list (config, str, action) < 0)
+                    return -1;
+                s = 1;
+            } else {
+                str++;
+            }
+            break;
+        }
+    }
+
+    return 0;
+}
+
+static char *
+parse_addr_pair (const char *str, const char *ps[4])
+{
+    char *b;
+    int i = 0, j = 0, s = 0;
+
+    b = strdup (str);
+    if (!b)
+        return NULL;
+
+    /* parse state machine */
+    for (;;) {
+        switch (b[i]) {
+        case '\0':
+            goto exit;
+        case ':':
+            if (s != 1 && s != 2 && s != 3)
+                goto error;
+            if (s == 1 || s == 3) {
+                b[i++] = '\0';
+                if (j < 4)
+                    s = 0;
+            } else {
+                i++;
+            }
+            break;
+        case '[':
+            if (s != 0)
+                goto error;
+            ps[j++] = &b[++i];
+            s = 2;
+            break;
+        case ']':
+            if (s != 2)
+                goto error;
+            b[i++] = '\0';
+            s = 3;
+            break;
+        default:
+            if (s == 0) {
+                ps[j++] = &b[i++];
+                s = 1;
+            } else {
+                i++;
+            }
+            break;
+        }
+    }
+
+exit:
+    return b;
+
+error:
+    free (b);
+    return NULL;
+}
+
+static int
+parse_set_addr_pair (HevFshConfig *config, const char *str)
+{
+    const char *ps[4] = { 0 };
+    char *b;
+
+    b = parse_addr_pair (str, ps);
+    if (!b || !ps[0] || !ps[1]) {
+        free (b);
+        return -1;
+    }
+
+    if (ps[2] && ps[3]) {
+        hev_fsh_config_set_local_address (config, ps[0]);
+        hev_fsh_config_set_local_port (config, atoi (ps[1]));
+        hev_fsh_config_set_remote_address (config, ps[2]);
+        hev_fsh_config_set_remote_port (config, atoi (ps[3]));
+    } else if (ps[2]) {
+        hev_fsh_config_set_local_port (config, atoi (ps[0]));
+        hev_fsh_config_set_remote_address (config, ps[1]);
+        hev_fsh_config_set_remote_port (config, atoi (ps[2]));
+    } else {
+        hev_fsh_config_set_remote_address (config, ps[0]);
+        hev_fsh_config_set_remote_port (config, atoi (ps[1]));
+    }
+
+    return 0;
+}
+
+static int
+parse_server (HevFshConfig *config, const char *sa, const char *log)
+{
+    if (sa) {
+        const char *addr = NULL;
+        const char *port = NULL;
+
+        if (!parse_addr (sa, &addr, &port, NULL))
+            return -1;
+
+        hev_fsh_config_set_server_address (config, addr);
+        if (port)
+            hev_fsh_config_set_server_port (config, atoi (port));
+    }
+
+    hev_fsh_config_set_log (config, log);
+    hev_fsh_config_set_mode (config, HEV_FSH_CONFIG_MODE_SERVER);
+
+    return 0;
+}
+
+static int
+parse_client (HevFshConfig *config, int f, int p, const char *t1,
+              const char *t2, const char *w, const char *b, const char *u)
+{
+    const char *addr = NULL;
+    const char *port = NULL;
+    const char *token = NULL;
+    const char *ap = NULL;
+    const char *sa;
+    int mode;
+
+    if (!f && p) {
+        ap = t1;
+        sa = t2;
+    } else {
+        sa = t1;
+    }
+
+    if (!sa || !parse_addr (sa, &addr, &port, &token))
         return -1;
 
-    if (v3 && v4) {
-        hev_fsh_config_set_local_address (config, v1);
-        hev_fsh_config_set_local_port (config, atoi (v2));
-        hev_fsh_config_set_remote_address (config, v3);
-        hev_fsh_config_set_remote_port (config, atoi (v4));
-    } else if (v3) {
-        hev_fsh_config_set_local_port (config, atoi (v1));
-        hev_fsh_config_set_remote_address (config, v2);
-        hev_fsh_config_set_remote_port (config, atoi (v3));
+    hev_fsh_config_set_server_address (config, addr);
+    if (port)
+        hev_fsh_config_set_server_port (config, atoi (port));
+    hev_fsh_config_set_token (config, token);
+
+    if (f) {
+        if (p) {
+            if (w && b)
+                return -1;
+
+            if (w) {
+                hev_fsh_config_addr_list_add (config, 0, NULL, 0, 0);
+                if (parse_set_addr_list (config, w, 1) < 0)
+                    return -1;
+            } else if (b) {
+                hev_fsh_config_addr_list_add (config, 0, NULL, 0, 1);
+                if (parse_set_addr_list (config, b, 0) < 0)
+                    return -1;
+            } else {
+                hev_fsh_config_addr_list_add (config, 0, NULL, 0, 1);
+            }
+            mode = HEV_FSH_CONFIG_MODE_FORWARDER_PORT;
+        } else {
+            hev_fsh_config_set_user (config, u);
+            mode = HEV_FSH_CONFIG_MODE_FORWARDER_TERM;
+        }
     } else {
-        hev_fsh_config_set_remote_address (config, v1);
-        hev_fsh_config_set_remote_port (config, atoi (v2));
+        if (!token)
+            return -1;
+
+        if (p) {
+            if (parse_set_addr_pair (config, ap) < 0)
+                return -1;
+            mode = HEV_FSH_CONFIG_MODE_CONNECTOR_PORT;
+        } else {
+            mode = HEV_FSH_CONFIG_MODE_CONNECTOR_TERM;
+        }
     }
+
+    hev_fsh_config_set_mode (config, mode);
 
     return 0;
 }
@@ -128,7 +361,6 @@ static int
 parse_args (HevFshConfig *config, int argc, char *argv[])
 {
     int opt;
-    int mode;
     int s = 0;
     int f = 0;
     int p = 0;
@@ -176,77 +408,12 @@ parse_args (HevFshConfig *config, int argc, char *argv[])
         t2 = argv[optind++];
 
     if (s) {
-        const char *sa = t1;
-
-        if (sa) {
-            char *addr;
-            char *port;
-
-            parse_addr (sa, &addr, &port, NULL);
-            hev_fsh_config_set_server_address (config, addr);
-            if (port)
-                hev_fsh_config_set_server_port (config, atoi (port));
-        }
-
-        hev_fsh_config_set_log (config, l);
-        mode = HEV_FSH_CONFIG_MODE_SERVER;
-    } else {
-        char *addr;
-        char *port;
-        char *token;
-        const char *sa;
-        const char *ap = NULL;
-
-        if (!f && p) {
-            ap = t1;
-            sa = t2;
-        } else {
-            sa = t1;
-        }
-
-        if (!sa)
+        if (parse_server (config, t1, l) < 0)
             return -1;
-
-        parse_addr (sa, &addr, &port, &token);
-        hev_fsh_config_set_server_address (config, addr);
-        if (port)
-            hev_fsh_config_set_server_port (config, atoi (port));
-        hev_fsh_config_set_token (config, token);
-
-        if (f) {
-            if (p) {
-                if (w && b)
-                    return -1;
-
-                if (w) {
-                    hev_fsh_config_addr_list_add (config, 0, NULL, 0, 0);
-                    parse_addr_list (config, w, 1);
-                } else if (b) {
-                    hev_fsh_config_addr_list_add (config, 0, NULL, 0, 1);
-                    parse_addr_list (config, b, 0);
-                } else {
-                    hev_fsh_config_addr_list_add (config, 0, NULL, 0, 1);
-                }
-                mode = HEV_FSH_CONFIG_MODE_FORWARDER_PORT;
-            } else {
-                hev_fsh_config_set_user (config, u);
-                mode = HEV_FSH_CONFIG_MODE_FORWARDER_TERM;
-            }
-        } else {
-            if (!token)
-                return -1;
-
-            if (p) {
-                if (0 > parse_addr_pair (config, ap))
-                    return -1;
-                mode = HEV_FSH_CONFIG_MODE_CONNECTOR_PORT;
-            } else {
-                mode = HEV_FSH_CONFIG_MODE_CONNECTOR_TERM;
-            }
-        }
+    } else {
+        if (parse_client (config, f, p, t1, t2, w, b, u) < 0)
+            return -1;
     }
-
-    hev_fsh_config_set_mode (config, mode);
 
     return 0;
 }
@@ -277,6 +444,24 @@ setup_log (int mode, const char *log)
     close (2);
     dup2 (fd, 1);
     dup2 (fd, 2);
+
+    return 0;
+}
+
+int
+hev_fsh_parse_sockaddr (struct sockaddr_in6 *saddr, const char *addr, int port)
+{
+    saddr->sin6_family = AF_INET6;
+    saddr->sin6_port = htons (port);
+    memset (&saddr->sin6_addr, 0, sizeof (saddr->sin6_addr));
+
+    if (inet_pton (AF_INET, addr, &saddr->sin6_addr.s6_addr[12]) == 1) {
+        ((uint16_t *)&saddr->sin6_addr)[5] = 0xffff;
+        return 4;
+    }
+
+    if (inet_pton (AF_INET6, addr, &saddr->sin6_addr) == 1)
+        return 6;
 
     return 0;
 }
