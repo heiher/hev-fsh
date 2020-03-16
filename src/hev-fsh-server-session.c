@@ -12,6 +12,7 @@
 #include <unistd.h>
 #include <string.h>
 #include <arpa/inet.h>
+#include <netinet/in.h>
 
 #include <hev-task.h>
 #include <hev-task-io.h>
@@ -143,21 +144,24 @@ sleep_wait (unsigned int milliseconds)
 static void
 fsh_server_log (HevFshServerSession *self, const char *type)
 {
-    struct sockaddr_in saddr = { 0 };
+    struct sockaddr_in6 saddr = { 0 };
     socklen_t salen = sizeof (saddr);
     struct tm *info;
     time_t rawtime;
     char token[40];
+    const char *sa;
+    char buf[64];
 
     time (&rawtime);
     info = localtime (&rawtime);
     hev_fsh_protocol_token_to_string (self->token, token);
     getpeername (self->client_fd, (struct sockaddr *)&saddr, &salen);
+    sa = inet_ntop (AF_INET6, &saddr.sin6_addr, buf, sizeof (buf));
 
-    printf ("[%04d-%02d-%02d %02d:%02d:%02d] %s %s %s:%d\n",
+    printf ("[%04d-%02d-%02d %02d:%02d:%02d] %s %s [%s]:%d\n",
             1900 + info->tm_year, info->tm_mon + 1, info->tm_mday,
-            info->tm_hour, info->tm_min, info->tm_sec, type, token,
-            inet_ntoa (saddr.sin_addr), ntohs (saddr.sin_port));
+            info->tm_hour, info->tm_min, info->tm_sec, type, token, sa,
+            ntohs (saddr.sin6_port));
     fflush (stdout);
 }
 
