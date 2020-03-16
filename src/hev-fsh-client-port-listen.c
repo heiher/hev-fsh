@@ -19,6 +19,7 @@
 #include <hev-task-io-socket.h>
 #include <hev-memory-allocator.h>
 
+#include "hev-main.h"
 #include "hev-fsh-client-port-connect.h"
 
 #include "hev-fsh-client-port-listen.h"
@@ -36,7 +37,7 @@ hev_fsh_client_port_listen_new (HevFshConfig *config, HevFshSessionManager *sm)
 {
     HevFshClientPortListen *self;
     HevFshSession *s;
-    struct sockaddr_in saddr;
+    struct sockaddr_in6 saddr;
     const char *addr;
     int reuse = 1;
     int port;
@@ -60,9 +61,11 @@ hev_fsh_client_port_listen_new (HevFshConfig *config, HevFshSessionManager *sm)
 
     addr = hev_fsh_config_get_local_address (config);
     port = hev_fsh_config_get_local_port (config);
-    saddr.sin_family = AF_INET;
-    saddr.sin_addr.s_addr = inet_addr (addr);
-    saddr.sin_port = htons (port);
+
+    if (hev_fsh_parse_sockaddr (&saddr, addr, port) == 0) {
+        fprintf (stderr, "Parse server address failed!\n");
+        goto exit;
+    }
 
     if (bind (self->base.fd, (struct sockaddr *)&saddr, sizeof (saddr)) < 0) {
         fprintf (stderr, "Bind client address failed!\n");
