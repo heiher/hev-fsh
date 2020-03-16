@@ -18,6 +18,7 @@ typedef struct _HevFshAddrListNode HevFshAddrListNode;
 struct _HevFshConfig
 {
     int mode;
+    int ip_type;
 
     const char *server_address;
     unsigned int server_port;
@@ -149,6 +150,18 @@ void
 hev_fsh_config_set_log (HevFshConfig *self, const char *val)
 {
     self->log = val;
+}
+
+int
+hev_fsh_config_get_ip_type (HevFshConfig *self)
+{
+    return self->ip_type;
+}
+
+void
+hev_fsh_config_set_ip_type (HevFshConfig *self, int val)
+{
+    self->ip_type = val;
 }
 
 unsigned int

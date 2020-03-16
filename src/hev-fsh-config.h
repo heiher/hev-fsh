@@ -46,6 +46,9 @@ void hev_fsh_config_set_token (HevFshConfig *self, const char *val);
 const char *hev_fsh_config_get_log (HevFshConfig *self);
 void hev_fsh_config_set_log (HevFshConfig *self, const char *val);
 
+int hev_fsh_config_get_ip_type (HevFshConfig *self);
+void hev_fsh_config_set_ip_type (HevFshConfig *self, int val);
+
 unsigned int hev_fsh_config_get_timeout (HevFshConfig *self);
 void hev_fsh_config_set_timeout (HevFshConfig *self, unsigned int val);
 
