@@ -92,8 +92,8 @@ hev_fsh_client_port_connect_task_entry (void *data)
     addr = hev_fsh_config_get_remote_address (base->config);
     port = hev_fsh_config_get_remote_port (base->config);
 
+    __builtin_bzero (msg_pinfo.addr, sizeof (msg_pinfo.addr));
     msg_pinfo.port = htons (port);
-    memset (msg_pinfo.addr, 0, sizeof (msg_pinfo.addr));
 
     if (inet_pton (AF_INET, addr, msg_pinfo.addr) == 1) {
         msg_pinfo.type = 4;
