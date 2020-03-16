@@ -94,11 +94,11 @@ hev_fsh_config_set_mode (HevFshConfig *self, int val)
     switch (val) {
     case HEV_FSH_CONFIG_MODE_SERVER:
         if (!self->server_address)
-            self->server_address = "0.0.0.0";
+            self->server_address = "::";
         break;
     default:
         if (!self->server_address)
-            self->server_address = "127.0.0.1";
+            self->server_address = "::1";
         break;
     }
 }
