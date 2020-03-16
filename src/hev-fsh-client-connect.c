@@ -66,7 +66,7 @@ hev_fsh_client_connect_send_connect (HevFshClientConnect *self)
 {
     HevFshMessage msg;
     HevFshMessageToken msg_token;
-    struct sockaddr_in saddr;
+    struct sockaddr_in6 saddr;
     struct sockaddr *addr;
     const char *token;
 
