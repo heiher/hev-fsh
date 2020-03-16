@@ -19,6 +19,7 @@
 #include <hev-task-io-socket.h>
 #include <hev-memory-allocator.h>
 
+#include "hev-main.h"
 #include "hev-fsh-server-session.h"
 #include "hev-fsh-session-manager.h"
 
@@ -48,19 +49,21 @@ HevFshBase *
 hev_fsh_server_new (HevFshConfig *config)
 {
     HevFshServer *self;
-    struct sockaddr_in saddr;
+    struct sockaddr_in6 saddr;
     int fd, port, reuse = 1;
     unsigned int timeout;
     const char *addr;
 
+    timeout = hev_fsh_config_get_timeout (config);
     addr = hev_fsh_config_get_server_address (config);
     port = hev_fsh_config_get_server_port (config);
-    timeout = hev_fsh_config_get_timeout (config);
-    saddr.sin_family = AF_INET;
-    saddr.sin_addr.s_addr = inet_addr (addr);
-    saddr.sin_port = htons (port);
 
-    fd = hev_task_io_socket_socket (AF_INET, SOCK_STREAM, IPPROTO_TCP);
+    if (hev_fsh_parse_sockaddr (&saddr, addr, port) == 0) {
+        fprintf (stderr, "Parse server address failed!\n");
+        goto exit;
+    }
+
+    fd = hev_task_io_socket_socket (AF_INET6, SOCK_STREAM, IPPROTO_TCP);
     if (fd < 0) {
         fprintf (stderr, "Create socket failed!\n");
         goto exit;
