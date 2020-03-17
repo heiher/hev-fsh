@@ -10,8 +10,6 @@
 #ifndef __HEV_FSH_CLIENT_BASE_H__
 #define __HEV_FSH_CLIENT_BASE_H__
 
-#include <netinet/in.h>
-
 #include "hev-fsh-config.h"
 #include "hev-fsh-session.h"
 #include "hev-fsh-session-manager.h"
@@ -27,16 +25,17 @@ struct _HevFshClientBase
 
     int fd;
     HevFshConfig *config;
+    HevFshSessionManager *sm;
 
     /* private */
-    HevFshSessionManager *_sm;
     HevFshClientBaseDestroy _destroy;
 };
 
-int hev_fsh_client_base_construct (HevFshClientBase *self, HevFshConfig *config,
-                                   HevFshSessionManager *sm);
+void hev_fsh_client_base_init (HevFshClientBase *self, HevFshConfig *config,
+                               HevFshSessionManager *sm);
 void hev_fsh_client_base_destroy (HevFshClientBase *self);
 
-int hev_fsh_client_base_resolv (HevFshClientBase *self, struct sockaddr *addr);
+int hev_fsh_client_base_listen (HevFshClientBase *self);
+int hev_fsh_client_base_connect (HevFshClientBase *self);
 
 #endif /* __HEV_FSH_CLIENT_BASE_H__ */
