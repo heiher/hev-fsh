@@ -27,24 +27,20 @@ hev_fsh_client_accept_construct (HevFshClientAccept *self, HevFshConfig *config,
 {
     HevFshSession *s = HEV_FSH_SESSION (self);
 
-    if (hev_fsh_client_base_construct (&self->base, config, sm) < 0) {
-        fprintf (stderr, "Construct client base failed!\n");
-        goto exit;
-    }
+    hev_fsh_client_base_init (&self->base, config, sm);
 
     s->task = hev_task_new (HEV_FSH_CONFIG_TASK_STACK_SIZE);
     if (!s->task) {
         fprintf (stderr, "Create client accept's task failed!\n");
-        goto exit_free;
+        goto exit;
     }
 
     memcpy (self->token, token, sizeof (HevFshToken));
     self->base._destroy = hev_fsh_client_accept_destroy;
     return 0;
 
-exit_free:
-    hev_fsh_client_base_destroy (&self->base);
 exit:
+    hev_fsh_client_base_destroy (&self->base);
     return -1;
 }
 
@@ -60,23 +56,13 @@ hev_fsh_client_accept_destroy (HevFshClientBase *base)
 int
 hev_fsh_client_accept_send_accept (HevFshClientAccept *self)
 {
-    HevFshMessage msg;
+    HevFshClientBase *base = HEV_FSH_CLIENT_BASE (self);
     HevFshMessageToken msg_token;
-    struct sockaddr_in6 saddr;
-    struct sockaddr *addr;
+    HevFshMessage msg;
     struct iovec iov[2];
     struct msghdr mh;
-    int fd;
 
-    fd = self->base.fd;
-    hev_task_add_fd (hev_task_self (), fd, POLLIN | POLLOUT);
-
-    addr = (struct sockaddr *)&saddr;
-    if (hev_fsh_client_base_resolv (&self->base, addr) < 0)
-        return -1;
-
-    if (hev_task_io_socket_connect (fd, addr, sizeof (saddr),
-                                    fsh_task_io_yielder, self) < 0)
+    if (hev_fsh_client_base_connect (base) < 0)
         return -1;
 
     msg.ver = 1;
@@ -92,8 +78,8 @@ hev_fsh_client_accept_send_accept (HevFshClientAccept *self)
     mh.msg_iov = iov;
     mh.msg_iovlen = 2;
 
-    if (hev_task_io_socket_sendmsg (fd, &mh, MSG_WAITALL, fsh_task_io_yielder,
-                                    self) <= 0)
+    if (hev_task_io_socket_sendmsg (base->fd, &mh, MSG_WAITALL,
+                                    fsh_task_io_yielder, self) <= 0)
         return -1;
 
     return 0;
