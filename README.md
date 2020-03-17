@@ -4,6 +4,11 @@
 
 HevFsh is a solution for connect to remote shell in local networks.
 
+**Features**
+* Shell.
+* TCP Port.
+* IPv4/IPv6. (dual stack)
+
 ## How to Build
 ```bash
 git clone --recursive git://github.com/heiher/hev-fsh
@@ -79,6 +84,33 @@ fsh -s -l /var/log/fsh.log
     # Splice to stdio (Support SSH ProxyCommand)
     fsh -p 192.168.0.1:22 10.0.0.1/8b9bf4e7-b2b2-4115-ac97-0c7f69433bc4
     ```
+
+**Common**:
+```bash
+fsh [-4 | -6] [-t TIMEOUT]
+
+# Resolve names to IPv4 addresses only
+fsh -4
+
+# Resolve names to IPv6 addresses only
+fsh -6
+
+# Session timeout (seconds)
+fsh -t 1000
+```
+
+**IPv6**:
+```bash
+fsh -s [::]:6339
+
+fsh -f [::1]:6339/8b9bf4e7-b2b2-4115-ac97-0c7f69433bc4
+
+fsh -f -p -w 127.0.0.1:22,[::1]:22 127.0.0.1/8b9bf4e7-b2b2-4115-ac97-0c7f69433bc4
+
+fsh -p [::1]:22 127.0.0.1/8b9bf4e7-b2b2-4115-ac97-0c7f69433bc4
+fsh -p 2200:[::1]:22 127.0.0.1/8b9bf4e7-b2b2-4115-ac97-0c7f69433bc4
+fsh -p [::1]:2200:[::1]:22 127.0.0.1/8b9bf4e7-b2b2-4115-ac97-0c7f69433bc4
+```
 
 ## Authors
 * **Heiher** - https://hev.cc
