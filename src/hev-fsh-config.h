@@ -10,6 +10,8 @@
 #ifndef __HEV_FSH_CONFIG_H__
 #define __HEV_FSH_CONFIG_H__
 
+#include <netinet/in.h>
+
 #define HEV_FSH_CONFIG_TASK_STACK_SIZE (4076)
 
 typedef struct _HevFshConfig HevFshConfig;
@@ -74,5 +76,11 @@ void hev_fsh_config_set_remote_address (HevFshConfig *self, const char *val);
 
 unsigned int hev_fsh_config_get_remote_port (HevFshConfig *self);
 void hev_fsh_config_set_remote_port (HevFshConfig *self, unsigned int val);
+
+/* Helper */
+struct sockaddr *hev_fsh_config_get_server_sockaddr (HevFshConfig *self,
+                                                     socklen_t *len);
+struct sockaddr *hev_fsh_config_get_local_sockaddr (HevFshConfig *self,
+                                                    socklen_t *len);
 
 #endif /* __HEV_CONFIG_H__ */
