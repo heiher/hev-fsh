@@ -68,49 +68,56 @@ static void
 hev_fsh_client_port_accept_task_entry (void *data)
 {
     HevFshClientPortAccept *self = HEV_FSH_CLIENT_PORT_ACCEPT (data);
+    HevFshClientBase *base = HEV_FSH_CLIENT_BASE (data);
     HevFshMessagePortInfo msg_pinfo;
-    struct sockaddr_in6 addr;
+    struct sockaddr_storage addr;
+    socklen_t addr_len;
     int rfd, lfd;
 
-    rfd = self->base.base.fd;
     if (hev_fsh_client_accept_send_accept (&self->base) < 0)
         goto quit;
 
+    rfd = base->fd;
     /* recv message port info */
     if (hev_task_io_socket_recv (rfd, &msg_pinfo, sizeof (msg_pinfo),
                                  MSG_WAITALL, fsh_task_io_yielder, self) <= 0)
         goto quit;
 
-    if (!hev_fsh_config_addr_list_contains (self->base.base.config,
-                                            msg_pinfo.type, msg_pinfo.addr,
-                                            msg_pinfo.port))
+    if (!hev_fsh_config_addr_list_contains (base->config, msg_pinfo.type,
+                                            msg_pinfo.addr, msg_pinfo.port))
         goto quit;
 
-    __builtin_bzero (&addr, sizeof (addr));
-    addr.sin6_family = AF_INET6;
-    addr.sin6_port = msg_pinfo.port;
-
     switch (msg_pinfo.type) {
-    case 4:
-        memcpy (&addr.sin6_addr.s6_addr[12], msg_pinfo.addr, 4);
-        ((uint16_t *)&addr.sin6_addr)[5] = 0xffff;
+    case 4: {
+        struct sockaddr_in *addr4 = (struct sockaddr_in *)&addr;
+        addr_len = sizeof (struct sockaddr_in);
+        __builtin_bzero (addr4, addr_len);
+        addr4->sin_family = AF_INET;
+        addr4->sin_port = msg_pinfo.port;
+        memcpy (&addr4->sin_addr, msg_pinfo.addr, sizeof (addr4->sin_addr));
         break;
-    case 6:
-        memcpy (&addr.sin6_addr, msg_pinfo.addr, 16);
+    }
+    case 6: {
+        struct sockaddr_in6 *addr6 = (struct sockaddr_in6 *)&addr;
+        addr_len = sizeof (struct sockaddr_in6);
+        __builtin_bzero (addr6, addr_len);
+        addr6->sin6_family = AF_INET6;
+        addr6->sin6_port = msg_pinfo.port;
+        memcpy (&addr6->sin6_addr, msg_pinfo.addr, sizeof (addr6->sin6_addr));
         break;
+    }
     default:
         goto quit;
     }
 
-    lfd = hev_task_io_socket_socket (AF_INET6, SOCK_STREAM, IPPROTO_TCP);
+    lfd = hev_task_io_socket_socket (addr.ss_family, SOCK_STREAM, IPPROTO_TCP);
     if (lfd < 0)
         goto quit;
 
     hev_task_add_fd (hev_task_self (), lfd, POLLIN | POLLOUT);
 
-    if (hev_task_io_socket_connect (lfd, (struct sockaddr *)&addr,
-                                    sizeof (addr), fsh_task_io_yielder,
-                                    self) < 0)
+    if (hev_task_io_socket_connect (lfd, (struct sockaddr *)&addr, addr_len,
+                                    fsh_task_io_yielder, self) < 0)
         goto quit_close_fd;
 
     hev_task_io_splice (rfd, rfd, lfd, lfd, 8192, fsh_task_io_yielder, self);
@@ -118,5 +125,5 @@ hev_fsh_client_port_accept_task_entry (void *data)
 quit_close_fd:
     close (lfd);
 quit:
-    hev_fsh_client_base_destroy ((HevFshClientBase *)self);
+    hev_fsh_client_base_destroy (base);
 }
