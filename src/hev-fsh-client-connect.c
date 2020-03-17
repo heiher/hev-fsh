@@ -32,23 +32,19 @@ hev_fsh_client_connect_construct (HevFshClientConnect *self,
 {
     HevFshSession *s = HEV_FSH_SESSION (self);
 
-    if (hev_fsh_client_base_construct (&self->base, config, sm) < 0) {
-        fprintf (stderr, "Construct client base failed!\n");
-        goto exit;
-    }
+    hev_fsh_client_base_init (&self->base, config, sm);
 
     s->task = hev_task_new (HEV_FSH_CONFIG_TASK_STACK_SIZE);
     if (!s->task) {
         fprintf (stderr, "Create client connect's task failed!\n");
-        goto exit_free;
+        goto exit;
     }
 
     self->base._destroy = hev_fsh_client_connect_destroy;
     return 0;
 
-exit_free:
-    hev_fsh_client_base_destroy (&self->base);
 exit:
+    hev_fsh_client_base_destroy (&self->base);
     return -1;
 }
 
@@ -64,31 +60,21 @@ hev_fsh_client_connect_destroy (HevFshClientBase *base)
 int
 hev_fsh_client_connect_send_connect (HevFshClientConnect *self)
 {
-    HevFshMessage msg;
+    HevFshClientBase *base = HEV_FSH_CLIENT_BASE (self);
     HevFshMessageToken msg_token;
-    struct sockaddr_in6 saddr;
-    struct sockaddr *addr;
+    HevFshMessage msg;
     const char *token;
 
-    hev_task_add_fd (hev_task_self (), self->base.fd, POLLIN | POLLOUT);
-
-    msg.ver = 1;
-    msg.cmd = HEV_FSH_CMD_CONNECT;
-    addr = (struct sockaddr *)&saddr;
-    token = hev_fsh_config_get_token (self->base.config);
-
-    if (hev_fsh_client_base_resolv (&self->base, addr) < 0) {
-        fprintf (stderr, "Resolv server address failed!\n");
-        return -1;
-    }
-
-    if (hev_task_io_socket_connect (self->base.fd, addr, sizeof (saddr),
-                                    fsh_task_io_yielder, self) < 0) {
+    if (hev_fsh_client_base_connect (base) < 0) {
         fprintf (stderr, "Connect to server failed!\n");
         return -1;
     }
 
-    if (hev_task_io_socket_send (self->base.fd, &msg, sizeof (msg), MSG_WAITALL,
+    msg.ver = 1;
+    msg.cmd = HEV_FSH_CMD_CONNECT;
+    token = hev_fsh_config_get_token (base->config);
+
+    if (hev_task_io_socket_send (base->fd, &msg, sizeof (msg), MSG_WAITALL,
                                  fsh_task_io_yielder, self) <= 0)
         return -1;
 
@@ -97,7 +83,7 @@ hev_fsh_client_connect_send_connect (HevFshClientConnect *self)
         return -1;
     }
 
-    if (hev_task_io_socket_send (self->base.fd, &msg_token, sizeof (msg_token),
+    if (hev_task_io_socket_send (base->fd, &msg_token, sizeof (msg_token),
                                  MSG_WAITALL, fsh_task_io_yielder, self) <= 0)
         return -1;
 
