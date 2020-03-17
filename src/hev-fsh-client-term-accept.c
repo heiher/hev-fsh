@@ -154,16 +154,17 @@ static void
 hev_fsh_client_term_accept_task_entry (void *data)
 {
     HevFshClientTermAccept *self = HEV_FSH_CLIENT_TERM_ACCEPT (data);
+    HevFshClientBase *base = HEV_FSH_CLIENT_BASE (data);
     HevFshMessageTermInfo msg_tinfo;
     HevTaskCallForkPty *fpty;
     HevTaskCall *call;
     int sfd, pfd;
     void *ptr;
 
-    sfd = self->base.base.fd;
     if (hev_fsh_client_accept_send_accept (&self->base) < 0)
         goto quit;
 
+    sfd = base->fd;
     /* recv msg term info */
     if (hev_task_io_socket_recv (sfd, &msg_tinfo, sizeof (msg_tinfo),
                                  MSG_WAITALL, fsh_task_io_yielder, self) <= 0)
@@ -176,7 +177,7 @@ hev_fsh_client_term_accept_task_entry (void *data)
     fpty = (HevTaskCallForkPty *)call;
     fpty->pfd = &pfd;
     fpty->term_info = &msg_tinfo;
-    fpty->config = self->base.base.config;
+    fpty->config = base->config;
 
     ptr = hev_task_call_jump (call, forkpty_entry);
     hev_task_call_destroy (call);
@@ -192,5 +193,5 @@ hev_fsh_client_term_accept_task_entry (void *data)
 quit_close_fd:
     close (pfd);
 quit:
-    hev_fsh_client_base_destroy ((HevFshClientBase *)self);
+    hev_fsh_client_base_destroy (base);
 }
