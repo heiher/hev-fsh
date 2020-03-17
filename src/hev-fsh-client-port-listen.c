@@ -19,7 +19,6 @@
 #include <hev-task-io-socket.h>
 #include <hev-memory-allocator.h>
 
-#include "hev-main.h"
 #include "hev-fsh-client-port-connect.h"
 
 #include "hev-fsh-client-port-listen.h"
@@ -37,10 +36,6 @@ hev_fsh_client_port_listen_new (HevFshConfig *config, HevFshSessionManager *sm)
 {
     HevFshClientPortListen *self;
     HevFshSession *s;
-    struct sockaddr_in6 saddr;
-    const char *addr;
-    int reuse = 1;
-    int port;
 
     self = hev_malloc0 (sizeof (HevFshClientPortListen));
     if (!self) {
@@ -48,50 +43,21 @@ hev_fsh_client_port_listen_new (HevFshConfig *config, HevFshSessionManager *sm)
         goto exit;
     }
 
-    if (hev_fsh_client_base_construct (&self->base, config, sm) < 0) {
-        fprintf (stderr, "Construct client base failed!\n");
-        goto exit_free;
-    }
-
-    if (setsockopt (self->base.fd, SOL_SOCKET, SO_REUSEADDR, &reuse,
-                    sizeof (reuse)) < 0) {
-        fprintf (stderr, "Set reuse address failed!\n");
-        goto exit_free_base;
-    }
-
-    addr = hev_fsh_config_get_local_address (config);
-    port = hev_fsh_config_get_local_port (config);
-
-    if (hev_fsh_parse_sockaddr (&saddr, addr, port) == 0) {
-        fprintf (stderr, "Parse server address failed!\n");
-        goto exit;
-    }
-
-    if (bind (self->base.fd, (struct sockaddr *)&saddr, sizeof (saddr)) < 0) {
-        fprintf (stderr, "Bind client address failed!\n");
-        goto exit_free_base;
-    }
-
-    if (listen (self->base.fd, 5) < 0) {
-        fprintf (stderr, "Listen client socket failed!\n");
-        goto exit_free_base;
-    }
+    hev_fsh_client_base_init (&self->base, config, sm);
 
     s = HEV_FSH_SESSION (self);
     s->task = hev_task_new (HEV_FSH_CONFIG_TASK_STACK_SIZE);
     if (!s->task) {
         fprintf (stderr, "Create client port's task failed!\n");
-        goto exit_free_base;
+        goto exit_free;
     }
 
-    hev_task_run (s->task, hev_fsh_client_port_listen_task_entry, self);
-
     self->base._destroy = hev_fsh_client_port_listen_destroy;
+    hev_task_run (s->task, hev_fsh_client_port_listen_task_entry, self);
     return &self->base;
 
-exit_free_base:
-    hev_fsh_client_base_destroy (&self->base);
 exit_free:
+    hev_fsh_client_base_destroy (&self->base);
     hev_free (self);
 exit:
     return NULL;
@@ -107,12 +73,16 @@ static void
 hev_fsh_client_port_listen_task_entry (void *data)
 {
     HevFshClientPortListen *self = HEV_FSH_CLIENT_PORT_LISTEN (data);
+    HevFshClientBase *base = HEV_FSH_CLIENT_BASE (data);
 
-    hev_task_add_fd (hev_task_self (), self->base.fd, POLLIN);
+    if (hev_fsh_client_base_listen (base) < 0) {
+        fprintf (stderr, "Listen client socket failed!\n");
+        goto exit;
+    }
 
     for (;;) {
         HevFshConfig *config = self->base.config;
-        HevFshSessionManager *sm = self->base._sm;
+        HevFshSessionManager *sm = self->base.sm;
         int fd;
 
         fd = hev_task_io_socket_accept (self->base.fd, NULL, NULL, NULL, NULL);
@@ -123,5 +93,6 @@ hev_fsh_client_port_listen_task_entry (void *data)
             close (fd);
     }
 
+exit:
     hev_fsh_client_base_destroy (&self->base);
 }
