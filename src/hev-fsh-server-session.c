@@ -144,24 +144,42 @@ sleep_wait (unsigned int milliseconds)
 static void
 fsh_server_log (HevFshServerSession *self, const char *type)
 {
-    struct sockaddr_in6 saddr = { 0 };
-    socklen_t salen = sizeof (saddr);
+    struct sockaddr_storage addr;
+    socklen_t addr_len;
     struct tm *info;
     time_t rawtime;
-    char token[40];
     const char *sa;
+    char token[40];
     char buf[64];
+    int port;
 
     time (&rawtime);
     info = localtime (&rawtime);
     hev_fsh_protocol_token_to_string (self->token, token);
-    getpeername (self->client_fd, (struct sockaddr *)&saddr, &salen);
-    sa = inet_ntop (AF_INET6, &saddr.sin6_addr, buf, sizeof (buf));
+
+    port = 0;
+    sa = NULL;
+    addr_len = sizeof (addr);
+    __builtin_bzero (&addr, addr_len);
+    getpeername (self->client_fd, (struct sockaddr *)&addr, &addr_len);
+    switch (addr.ss_family) {
+    case AF_INET: {
+        struct sockaddr_in *addr4 = (struct sockaddr_in *)&addr;
+        sa = inet_ntop (AF_INET, &addr4->sin_addr, buf, sizeof (buf));
+        port = ntohs (addr4->sin_port);
+        break;
+    }
+    case AF_INET6: {
+        struct sockaddr_in6 *addr6 = (struct sockaddr_in6 *)&addr;
+        sa = inet_ntop (AF_INET6, &addr6->sin6_addr, buf, sizeof (buf));
+        port = ntohs (addr6->sin6_port);
+        break;
+    }
+    }
 
     printf ("[%04d-%02d-%02d %02d:%02d:%02d] %s %s [%s]:%d\n",
             1900 + info->tm_year, info->tm_mon + 1, info->tm_mday,
-            info->tm_hour, info->tm_min, info->tm_sec, type, token, sa,
-            ntohs (saddr.sin6_port));
+            info->tm_hour, info->tm_min, info->tm_sec, type, token, sa, port);
     fflush (stdout);
 }
 
