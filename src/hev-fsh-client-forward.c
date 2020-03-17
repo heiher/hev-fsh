@@ -51,16 +51,13 @@ hev_fsh_client_forward_new (HevFshConfig *config, HevFshSessionManager *sm,
         goto exit;
     }
 
-    if (hev_fsh_client_base_construct (&self->base, config, sm) < 0) {
-        fprintf (stderr, "Construct client base failed!\n");
-        goto exit_free;
-    }
+    hev_fsh_client_base_init (&self->base, config, sm);
 
     s = HEV_FSH_SESSION (self);
     s->task = hev_task_new (HEV_FSH_CONFIG_TASK_STACK_SIZE);
     if (!s->task) {
         fprintf (stderr, "Create client forward's task failed!\n");
-        goto exit_free_base;
+        goto exit_free;
     }
 
     self->notify = notify;
@@ -69,9 +66,8 @@ hev_fsh_client_forward_new (HevFshConfig *config, HevFshSessionManager *sm,
     hev_task_run (s->task, hev_fsh_client_forward_task_entry, self);
     return &self->base;
 
-exit_free_base:
-    hev_fsh_client_base_destroy (&self->base);
 exit_free:
+    hev_fsh_client_base_destroy (&self->base);
     hev_free (self);
 exit:
     return NULL;
@@ -174,20 +170,10 @@ static void
 hev_fsh_client_forward_task_entry (void *data)
 {
     HevFshClientForward *self = HEV_FSH_CLIENT_FORWARD (data);
-    struct sockaddr_in6 saddr;
-    struct sockaddr *addr;
+    HevFshClientBase *base = HEV_FSH_CLIENT_BASE (data);
     int keep_alive = 0;
 
-    hev_task_add_fd (hev_task_self (), self->base.fd, POLLIN | POLLOUT);
-
-    addr = (struct sockaddr *)&saddr;
-    if (hev_fsh_client_base_resolv (&self->base, addr) < 0) {
-        fprintf (stderr, "Resolv server address failed!\n");
-        goto exit;
-    }
-
-    if (hev_task_io_socket_connect (self->base.fd, addr, sizeof (saddr),
-                                    fsh_task_io_yielder, self) < 0) {
+    if (hev_fsh_client_base_connect (base) < 0) {
         fprintf (stderr, "Connect to server failed!\n");
         goto exit;
     }
@@ -199,12 +185,12 @@ hev_fsh_client_forward_task_entry (void *data)
         goto exit;
 
     for (;;) {
-        HevFshMessage msg;
         HevFshMessageToken msg_token;
-        int mode = hev_fsh_config_get_mode (self->base.config);
+        HevFshMessage msg;
         ssize_t len;
+        int mode;
 
-        len = hev_task_io_socket_recv (self->base.fd, &msg, sizeof (msg),
+        len = hev_task_io_socket_recv (base->fd, &msg, sizeof (msg),
                                        MSG_WAITALL, task_io_yielder, self);
         if (len == -2) {
             if (keep_alive++)
@@ -226,20 +212,21 @@ hev_fsh_client_forward_task_entry (void *data)
             goto exit;
         }
 
-        if (hev_task_io_socket_recv (self->base.fd, &msg_token,
-                                     sizeof (msg_token), MSG_WAITALL,
-                                     fsh_task_io_yielder, self) <= 0)
+        if (hev_task_io_socket_recv (base->fd, &msg_token, sizeof (msg_token),
+                                     MSG_WAITALL, fsh_task_io_yielder,
+                                     self) <= 0)
             goto exit;
 
         if (memcmp (msg_token.token, self->token, sizeof (HevFshToken)) != 0)
             goto exit;
 
+        mode = hev_fsh_config_get_mode (base->config);
         if (HEV_FSH_CONFIG_MODE_FORWARDER_PORT == mode)
-            hev_fsh_client_port_accept_new (self->base.config, self->token,
-                                            self->base._sm);
+            hev_fsh_client_port_accept_new (base->config, self->token,
+                                            base->sm);
         else
-            hev_fsh_client_term_accept_new (self->base.config, self->token,
-                                            self->base._sm);
+            hev_fsh_client_term_accept_new (base->config, self->token,
+                                            base->sm);
 
         if (write_keep_alive (self) < 0)
             goto exit;
@@ -247,9 +234,9 @@ hev_fsh_client_forward_task_entry (void *data)
 
 exit:
     if (self->notify) {
-        hev_task_del_fd (hev_task_self (), self->base.fd);
+        hev_task_del_fd (hev_task_self (), base->fd);
         hev_task_sleep (1000);
-        self->notify (&self->base.base, self->notify_data);
+        self->notify (&base->base, self->notify_data);
     }
-    hev_fsh_client_base_destroy (&self->base);
+    hev_fsh_client_base_destroy (base);
 }
