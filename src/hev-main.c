@@ -283,7 +283,7 @@ parse_server (HevFshConfig *config, const char *sa, const char *log)
 
         hev_fsh_config_set_server_address (config, addr);
         if (port)
-            hev_fsh_config_set_server_port (config, atoi (port));
+            hev_fsh_config_set_server_port (config, port);
     }
 
     hev_fsh_config_set_log (config, log);
@@ -315,7 +315,7 @@ parse_client (HevFshConfig *config, int f, int p, const char *t1,
 
     hev_fsh_config_set_server_address (config, addr);
     if (port)
-        hev_fsh_config_set_server_port (config, atoi (port));
+        hev_fsh_config_set_server_port (config, port);
     hev_fsh_config_set_token (config, token);
 
     if (f) {
