@@ -78,6 +78,9 @@ hev_fsh_client_base_listen (HevFshClientBase *self)
     int one = 1;
 
     addr = hev_fsh_config_get_local_sockaddr (self->config, &addr_len);
+    if (!addr)
+        return -1;
+
     self->fd = client_base_socket (addr->sa_family);
     if (self->fd < 0)
         return -1;
@@ -103,6 +106,9 @@ hev_fsh_client_base_connect (HevFshClientBase *self)
     socklen_t addr_len;
 
     addr = hev_fsh_config_get_server_sockaddr (self->config, &addr_len);
+    if (!addr)
+        return -1;
+
     self->fd = client_base_socket (addr->sa_family);
     if (self->fd < 0)
         return -1;
