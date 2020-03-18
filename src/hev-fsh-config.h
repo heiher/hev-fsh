@@ -39,8 +39,8 @@ void hev_fsh_config_set_mode (HevFshConfig *self, int val);
 const char *hev_fsh_config_get_server_address (HevFshConfig *self);
 void hev_fsh_config_set_server_address (HevFshConfig *self, const char *val);
 
-unsigned int hev_fsh_config_get_server_port (HevFshConfig *self);
-void hev_fsh_config_set_server_port (HevFshConfig *self, unsigned int val);
+const char *hev_fsh_config_get_server_port (HevFshConfig *self);
+void hev_fsh_config_set_server_port (HevFshConfig *self, const char *val);
 
 const char *hev_fsh_config_get_token (HevFshConfig *self);
 void hev_fsh_config_set_token (HevFshConfig *self, const char *val);

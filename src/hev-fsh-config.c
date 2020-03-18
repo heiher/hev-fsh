@@ -9,8 +9,10 @@
 
 #include <netdb.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <arpa/inet.h>
+#include <sys/types.h>
 #include <sys/socket.h>
 
 #include <hev-task-call.h>
@@ -27,7 +29,7 @@ struct _HevFshConfig
     int ip_type;
 
     const char *server_address;
-    unsigned int server_port;
+    const char *server_port;
     unsigned int timeout;
 
     const char *log;
@@ -48,7 +50,6 @@ struct _HevTaskCallResolv
     HevTaskCall base;
 
     HevFshConfig *config;
-    struct sockaddr *addr;
     socklen_t *len;
 };
 
@@ -75,7 +76,7 @@ hev_fsh_config_new (void)
     }
 
     self->timeout = 300;
-    self->server_port = 6339;
+    self->server_port = "6339";
     self->local_address = "127.0.0.1";
 
     return self;
@@ -131,14 +132,14 @@ hev_fsh_config_set_server_address (HevFshConfig *self, const char *val)
     self->server_address = val;
 }
 
-unsigned int
+const char *
 hev_fsh_config_get_server_port (HevFshConfig *self)
 {
     return self->server_port;
 }
 
 void
-hev_fsh_config_set_server_port (HevFshConfig *self, unsigned int val)
+hev_fsh_config_set_server_port (HevFshConfig *self, const char *val)
 {
     self->server_port = val;
 }
@@ -337,47 +338,37 @@ resolv_entry (HevTaskCall *call)
 {
     HevTaskCallResolv *resolv = (HevTaskCallResolv *)call;
     const char *address = resolv->config->server_address;
-    int port = resolv->config->server_port;
+    const char *port = resolv->config->server_port;
     static struct sockaddr_storage addr;
-    struct hostent *h;
+    struct addrinfo *res = NULL;
+    struct addrinfo hints;
+    int s;
 
+    __builtin_bzero (&hints, sizeof (hints));
     switch (resolv->config->ip_type) {
     case 4:
-        h = gethostbyname2 (address, AF_INET);
+        hints.ai_family = AF_INET;
         break;
     case 6:
-        h = gethostbyname2 (address, AF_INET6);
+        hints.ai_family = AF_INET6;
         break;
     default:
-        h = gethostbyname (address);
+        hints.ai_family = AF_UNSPEC;
         break;
     }
+    hints.ai_socktype = SOCK_STREAM;
+    hints.ai_protocol = IPPROTO_TCP;
 
-    if (!h) {
+    s = getaddrinfo (address, port, &hints, &res);
+    if ((s != 0) || !res) {
         hev_task_call_set_retval (call, NULL);
         return;
     }
 
-    if (h->h_addrtype == AF_INET6) {
-        struct sockaddr_in6 *addr6 = (struct sockaddr_in6 *)&addr;
-
-        *resolv->len = sizeof (struct sockaddr_in6);
-        __builtin_bzero (addr6, *resolv->len);
-        addr6->sin6_family = AF_INET6;
-        addr6->sin6_port = htons (port);
-        memcpy (&addr6->sin6_addr, h->h_addr, sizeof (addr6->sin6_addr));
-    } else {
-        struct sockaddr_in *addr4 = (struct sockaddr_in *)&addr;
-        ;
-
-        *resolv->len = sizeof (struct sockaddr_in);
-        __builtin_bzero (addr4, *resolv->len);
-        addr4->sin_family = AF_INET;
-        addr4->sin_port = htons (port);
-        memcpy (&addr4->sin_addr, h->h_addr, sizeof (addr4->sin_addr));
-    }
-
+    *resolv->len = res->ai_addrlen;
+    memcpy (&addr, res->ai_addr, res->ai_addrlen);
     hev_task_call_set_retval (call, &addr);
+    freeaddrinfo (res);
 }
 
 struct sockaddr *
@@ -385,7 +376,7 @@ hev_fsh_config_get_server_sockaddr (HevFshConfig *self, socklen_t *len)
 {
     struct sockaddr *addr;
 
-    addr = parse_sockaddr (len, self->server_address, self->server_port);
+    addr = parse_sockaddr (len, self->server_address, atoi (self->server_port));
     if (!addr) {
         HevTaskCall *call;
         HevTaskCallResolv *resolv;
@@ -396,7 +387,6 @@ hev_fsh_config_get_server_sockaddr (HevFshConfig *self, socklen_t *len)
 
         resolv = (HevTaskCallResolv *)call;
         resolv->config = self;
-        resolv->addr = addr;
         resolv->len = len;
 
         addr = hev_task_call_jump (call, resolv_entry);
