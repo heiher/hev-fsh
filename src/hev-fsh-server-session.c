@@ -30,6 +30,7 @@ enum
 {
     TYPE_FORWARD = 1,
     TYPE_CONNECT,
+    TYPE_SPLICE,
 };
 
 enum
@@ -346,6 +347,7 @@ fsh_server_do_accept (HevFshServerSession *self)
     }
 
     ss = HEV_FSH_SERVER_SESSION (s);
+    ss->type = TYPE_SPLICE;
     ss->remote_fd = self->client_fd;
     hev_task_del_fd (hev_task_self (), self->client_fd);
     hev_task_add_fd (s->task, ss->remote_fd, POLLIN | POLLOUT);
