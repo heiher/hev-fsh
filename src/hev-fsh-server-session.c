@@ -19,6 +19,8 @@
 #include <hev-task-io-socket.h>
 #include <hev-memory-allocator.h>
 
+#include "hev-rbtree.h"
+#include "hev-compiler.h"
 #include "hev-fsh-config.h"
 #include "hev-fsh-protocol.h"
 
@@ -50,6 +52,7 @@ enum
 struct _HevFshServerSession
 {
     HevFshSession base;
+    HevRBTreeNode node;
 
     int client_fd;
     int remote_fd;
@@ -57,6 +60,7 @@ struct _HevFshServerSession
     int type;
     int msg_ver;
     HevFshToken token;
+    HevRBTree *sessions_tree;
 
     HevFshSessionNotify notify;
     void *notify_data;
@@ -66,7 +70,7 @@ static void hev_fsh_server_session_task_entry (void *data);
 
 HevFshServerSession *
 hev_fsh_server_session_new (int client_fd, HevFshSessionNotify notify,
-                            void *notify_data)
+                            void *notify_data, HevRBTree *sessions_tree)
 {
     HevFshServerSession *self;
     HevTask *task;
@@ -85,6 +89,7 @@ hev_fsh_server_session_new (int client_fd, HevFshSessionNotify notify,
     self->notify_data = notify_data;
     self->base.task = task;
     self->base.hp = HEV_FSH_SESSION_HP;
+    self->sessions_tree = sessions_tree;
     hev_task_set_priority (task, 9);
     return self;
 
@@ -106,33 +111,65 @@ hev_fsh_server_session_run (HevFshServerSession *self)
     hev_task_run (self->base.task, hev_fsh_server_session_task_entry, self);
 }
 
-static HevFshSession *
-fsh_server_find_session_by_token (HevFshServerSession *self, int type,
-                                  HevFshToken token)
+static void
+fsh_server_session_tree_insert (HevRBTree *tree, HevFshSession *s)
 {
-    HevFshSession *s;
+    HevFshServerSession *ss = HEV_FSH_SERVER_SESSION (s);
+    HevRBTreeNode **n = &tree->root, *parent = NULL;
 
-    for (s = self->base.prev; s; s = s->prev) {
-        HevFshServerSession *ss = HEV_FSH_SERVER_SESSION (s);
+    while (*n) {
+        HevFshServerSession *t = container_of (*n, HevFshServerSession, node);
 
-        if (ss->type != type)
-            continue;
-        if (memcmp (token, ss->token, sizeof (HevFshToken)) == 0)
-            break;
-    }
+        parent = *n;
 
-    if (!s) {
-        for (s = self->base.next; s; s = s->next) {
-            HevFshServerSession *ss = HEV_FSH_SERVER_SESSION (s);
-
-            if (ss->type != type)
-                continue;
-            if (memcmp (token, ss->token, sizeof (HevFshToken)) == 0)
-                break;
+        if (ss->type < t->type) {
+            n = &((*n)->left);
+        } else if (ss->type > t->type) {
+            n = &((*n)->right);
+        } else {
+            if (memcmp (ss->token, t->token, sizeof (HevFshToken)) < 0)
+                n = &((*n)->left);
+            else
+                n = &((*n)->right);
         }
     }
 
-    return s;
+    hev_rbtree_node_link (&ss->node, parent, n);
+    hev_rbtree_insert_color (tree, &ss->node);
+}
+
+static void
+fsh_server_session_tree_remove (HevRBTree *tree, HevFshSession *s)
+{
+    HevFshServerSession *ss = HEV_FSH_SERVER_SESSION (s);
+
+    hev_rbtree_erase (tree, &ss->node);
+}
+
+static HevFshSession *
+fsh_server_session_tree_find (HevRBTree *tree, int type, HevFshToken *token)
+{
+    HevRBTreeNode **n = &tree->root;
+
+    while (*n) {
+        HevFshServerSession *t = container_of (*n, HevFshServerSession, node);
+
+        if (type < t->type) {
+            n = &((*n)->left);
+        } else if (type > t->type) {
+            n = &((*n)->right);
+        } else {
+            int res = memcmp (*token, t->token, sizeof (HevFshToken));
+            if (res < 0)
+                n = &((*n)->left);
+            else if (res > 0)
+                n = &((*n)->right);
+            else
+                return &t->base;
+        }
+    }
+
+    return NULL;
 }
 
 static void
@@ -228,8 +265,8 @@ fsh_server_do_login (HevFshServerSession *self)
         } else {
             HevFshSession *s;
 
-            s = fsh_server_find_session_by_token (self, TYPE_FORWARD,
-                                                  msg_token.token);
+            s = fsh_server_session_tree_find (self->sessions_tree, TYPE_FORWARD,
+                                              &msg_token.token);
             if (s) {
                 s->hp = 0;
                 hev_task_wakeup (s->task);
@@ -240,6 +277,7 @@ fsh_server_do_login (HevFshServerSession *self)
     }
 
     self->type = TYPE_FORWARD;
+    fsh_server_session_tree_insert (self->sessions_tree, &self->base);
     fsh_server_log (self, "L");
 
     return STEP_WRITE_MESSAGE_TOKEN;
@@ -285,6 +323,8 @@ fsh_server_do_connect (HevFshServerSession *self)
 
     self->type = TYPE_CONNECT;
     memcpy (self->token, msg_token.token, sizeof (HevFshToken));
+    fsh_server_session_tree_insert (self->sessions_tree, &self->base);
+    fsh_server_log (self, "C");
 
     return STEP_WRITE_MESSAGE_CONNECT;
 }
@@ -299,9 +339,8 @@ fsh_server_write_message_connect (HevFshServerSession *self)
     struct iovec iov[2];
     struct msghdr mh;
 
-    fsh_server_log (self, "C");
-
-    s = fsh_server_find_session_by_token (self, TYPE_FORWARD, self->token);
+    s = fsh_server_session_tree_find (self->sessions_tree, TYPE_FORWARD,
+                                      &self->token);
     if (!s) {
         sleep_wait (1500);
         return STEP_CLOSE_SESSION;
@@ -340,7 +379,8 @@ fsh_server_do_accept (HevFshServerSession *self)
                                  fsh_task_io_yielder, self) <= 0)
         return STEP_CLOSE_SESSION;
 
-    s = fsh_server_find_session_by_token (self, TYPE_CONNECT, msg_token.token);
+    s = fsh_server_session_tree_find (self->sessions_tree, TYPE_CONNECT,
+                                      &msg_token.token);
     if (!s) {
         sleep_wait (1500);
         return STEP_CLOSE_SESSION;
@@ -349,6 +389,8 @@ fsh_server_do_accept (HevFshServerSession *self)
     ss = HEV_FSH_SERVER_SESSION (s);
     ss->type = TYPE_SPLICE;
     ss->remote_fd = self->client_fd;
+    fsh_server_session_tree_remove (self->sessions_tree, s);
+    fsh_server_session_tree_insert (self->sessions_tree, s);
     hev_task_del_fd (hev_task_self (), self->client_fd);
     hev_task_add_fd (s->task, ss->remote_fd, POLLIN | POLLOUT);
     hev_task_wakeup (s->task);
@@ -395,8 +437,10 @@ fsh_server_do_splice (HevFshServerSession *self)
 static int
 fsh_server_close_session (HevFshServerSession *self)
 {
-    if (self->type)
+    if (self->type) {
+        fsh_server_session_tree_remove (self->sessions_tree, &self->base);
         fsh_server_log (self, "D");
+    }
 
     if (self->remote_fd >= 0)
         close (self->remote_fd);
