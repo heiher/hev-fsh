@@ -19,6 +19,7 @@
 #include <hev-task-io-socket.h>
 #include <hev-memory-allocator.h>
 
+#include "hev-rbtree.h"
 #include "hev-fsh-server-session.h"
 #include "hev-fsh-session-manager.h"
 
@@ -35,6 +36,7 @@ struct _HevFshServer
     HevTask *task_event;
     HevTask *task_worker;
     HevFshSessionManager *session_manager;
+    HevRBTree sessions_tree;
 };
 
 static void hev_fsh_server_destroy (HevFshBase *base);
@@ -219,7 +221,8 @@ hev_fsh_server_worker_task_entry (void *data)
             continue;
         }
 
-        ss = hev_fsh_server_session_new (fd, fsh_session_close_handler, self);
+        ss = hev_fsh_server_session_new (fd, fsh_session_close_handler, self,
+                                         &self->sessions_tree);
         if (!ss) {
             close (fd);
             continue;
