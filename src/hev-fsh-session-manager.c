@@ -9,6 +9,7 @@
 
 #include <stdio.h>
 
+#include <hev-task-mutex.h>
 #include <hev-memory-allocator.h>
 
 #include "hev-fsh-config.h"
@@ -20,6 +21,7 @@ struct _HevFshSessionManager
 {
     HevTask *task;
     HevFshSession *sessions;
+    HevTaskMutex mutex;
 
     int quit;
     int timeout;
@@ -51,6 +53,7 @@ hev_fsh_session_manager_new (int timeout, int autostop)
         self->timeout = timeout / HEV_FSH_SESSION_HP;
 
     self->autostop = autostop;
+    hev_task_mutex_init (&self->mutex);
 
     return self;
 
@@ -97,6 +100,7 @@ hev_fsh_session_manager_insert (HevFshSessionManager *self, HevFshSession *s)
 void
 hev_fsh_session_manager_remove (HevFshSessionManager *self, HevFshSession *s)
 {
+    hev_task_mutex_lock (&self->mutex);
 #ifdef _DEBUG
     printf ("Remove session: %p\n", s);
 #endif
@@ -108,6 +112,7 @@ hev_fsh_session_manager_remove (HevFshSessionManager *self, HevFshSession *s)
     if (s->next) {
         s->next->prev = s->prev;
     }
+    hev_task_mutex_unlock (&self->mutex);
 
     if (self->autostop && !self->sessions)
         hev_fsh_session_manager_stop (self);
@@ -123,6 +128,7 @@ hev_fsh_session_manager_task_entry (void *data)
 
         hev_task_sleep (self->timeout * 1000);
 
+        hev_task_mutex_lock (&self->mutex);
 #ifdef _DEBUG
         printf ("Enumerating sessions ...\n");
 #endif
@@ -142,6 +148,8 @@ hev_fsh_session_manager_task_entry (void *data)
 #ifdef _DEBUG
             printf ("Wakeup session %p's task %p\n", s, s->task);
 #endif
+            hev_task_yield (HEV_TASK_YIELD);
         }
+        hev_task_mutex_unlock (&self->mutex);
     }
 }
