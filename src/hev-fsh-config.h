@@ -12,7 +12,7 @@
 
 #include <netinet/in.h>
 
-#define HEV_FSH_CONFIG_TASK_STACK_SIZE (4076)
+#define HEV_FSH_CONFIG_TASK_STACK_SIZE (16384)
 
 typedef struct _HevFshConfig HevFshConfig;
 typedef enum _HevFshConfigMode HevFshConfigMode;
