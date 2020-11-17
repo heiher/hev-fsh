@@ -9,7 +9,7 @@ STRIP=$(CROSS_PREFIX)strip
 CCFLAGS=-O3 -pipe -Wall -Werror $(CFLAGS) \
 		-I$(THIRDPARTDIR)/hev-task-system/include
 LDFLAGS=-L$(THIRDPARTDIR)/hev-task-system/bin -lhev-task-system \
-		-lpthread -lutil
+		-lutil
 
 SRCDIR=src
 BINDIR=bin
@@ -42,7 +42,7 @@ endif
 all : $(TARGET)
 
 tp-build : $(THIRDPARTS)
-	@$(foreach dir,$^,$(MAKE) --no-print-directory -C $(dir);)
+	@$(foreach dir,$^,$(MAKE) --no-print-directory -C $(dir) ENABLE_PTHREAD=0;)
 
 tp-clean : $(THIRDPARTS)
 	@$(foreach dir,$^,$(MAKE) --no-print-directory -C $(dir) clean;)
