@@ -33,6 +33,7 @@ enum
     TYPE_FORWARD = 1,
     TYPE_CONNECT,
     TYPE_SPLICE,
+    TYPE_CLOSED,
 };
 
 enum
@@ -269,6 +270,9 @@ fsh_server_do_login (HevFshServerSession *self)
                                               &msg_token.token);
             if (s) {
                 s->hp = 0;
+                HEV_FSH_SERVER_SESSION (s)->type = TYPE_CLOSED;
+                fsh_server_session_tree_remove (self->sessions_tree, s);
+                fsh_server_session_tree_insert (self->sessions_tree, s);
                 hev_task_wakeup (s->task);
             }
 
