@@ -17,6 +17,7 @@
 #include <hev-task.h>
 #include <hev-task-io.h>
 #include <hev-task-io-socket.h>
+#include <hev-task-mutex.h>
 #include <hev-memory-allocator.h>
 
 #include "hev-rbtree.h"
@@ -61,6 +62,7 @@ struct _HevFshServerSession
     int type;
     int msg_ver;
     HevFshToken token;
+    HevTaskMutex wlock;
     HevRBTree *sessions_tree;
 
     HevFshSessionNotify notify;
@@ -91,6 +93,7 @@ hev_fsh_server_session_new (int client_fd, HevFshSessionNotify notify,
     self->base.task = task;
     self->base.hp = HEV_FSH_SESSION_HP;
     self->sessions_tree = sessions_tree;
+    hev_task_mutex_init (&self->wlock);
     hev_task_set_priority (task, 9);
     return self;
 
@@ -294,6 +297,7 @@ fsh_server_write_message_token (HevFshServerSession *self)
     HevFshMessageToken msg_token;
     struct iovec iov[2];
     struct msghdr mh;
+    ssize_t res;
 
     msg.ver = 1;
     msg.cmd = HEV_FSH_CMD_TOKEN;
@@ -308,8 +312,11 @@ fsh_server_write_message_token (HevFshServerSession *self)
     mh.msg_iov = iov;
     mh.msg_iovlen = 2;
 
-    if (hev_task_io_socket_sendmsg (self->client_fd, &mh, MSG_WAITALL,
-                                    fsh_task_io_yielder, self) <= 0)
+    hev_task_mutex_lock (&self->wlock);
+    res = hev_task_io_socket_sendmsg (self->client_fd, &mh, MSG_WAITALL,
+                                      fsh_task_io_yielder, self);
+    hev_task_mutex_unlock (&self->wlock);
+    if (res <= 0)
         return STEP_CLOSE_SESSION;
 
     return STEP_READ_MESSAGE;
@@ -342,6 +349,7 @@ fsh_server_write_message_connect (HevFshServerSession *self)
     HevFshMessageToken msg_token;
     struct iovec iov[2];
     struct msghdr mh;
+    ssize_t res;
 
     s = fsh_server_session_tree_find (self->sessions_tree, TYPE_FORWARD,
                                       &self->token);
@@ -364,8 +372,11 @@ fsh_server_write_message_connect (HevFshServerSession *self)
     mh.msg_iovlen = 2;
 
     ss = HEV_FSH_SERVER_SESSION (s);
-    if (hev_task_io_socket_sendmsg (ss->client_fd, &mh, MSG_WAITALL,
-                                    fsh_task_io_yielder, self) <= 0)
+    hev_task_mutex_lock (&ss->wlock);
+    res = hev_task_io_socket_sendmsg (ss->client_fd, &mh, MSG_WAITALL,
+                                      fsh_task_io_yielder, self);
+    hev_task_mutex_unlock (&ss->wlock);
+    if (res <= 0)
         return STEP_CLOSE_SESSION;
 
     return STEP_DO_SPLICE;
@@ -407,6 +418,7 @@ static int
 fsh_server_do_keep_alive (HevFshServerSession *self)
 {
     HevFshMessage msg;
+    ssize_t res;
 
     if (self->msg_ver == 1)
         goto exit;
@@ -414,8 +426,11 @@ fsh_server_do_keep_alive (HevFshServerSession *self)
     msg.ver = 1;
     msg.cmd = HEV_FSH_CMD_KEEP_ALIVE;
 
-    if (hev_task_io_socket_send (self->client_fd, &msg, sizeof (msg),
-                                 MSG_WAITALL, fsh_task_io_yielder, self) <= 0)
+    hev_task_mutex_lock (&self->wlock);
+    res = hev_task_io_socket_send (self->client_fd, &msg, sizeof (msg),
+                                   MSG_WAITALL, fsh_task_io_yielder, self);
+    hev_task_mutex_unlock (&self->wlock);
+    if (res <= 0)
         return STEP_CLOSE_SESSION;
 
 exit:
