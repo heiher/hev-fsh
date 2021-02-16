@@ -283,6 +283,9 @@ fsh_server_do_login (HevFshServerSession *self)
         }
     }
 
+    if (self->type)
+        return STEP_CLOSE_SESSION;
+
     self->type = TYPE_FORWARD;
     fsh_server_session_tree_insert (self->sessions_tree, &self->base);
     fsh_server_log (self, "L");
@@ -330,6 +333,9 @@ fsh_server_do_connect (HevFshServerSession *self)
     if (hev_task_io_socket_recv (self->client_fd, &msg_token,
                                  sizeof (msg_token), MSG_WAITALL,
                                  fsh_task_io_yielder, self) <= 0)
+        return STEP_CLOSE_SESSION;
+
+    if (self->type)
         return STEP_CLOSE_SESSION;
 
     self->type = TYPE_CONNECT;
