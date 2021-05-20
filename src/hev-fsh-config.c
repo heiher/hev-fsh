@@ -15,6 +15,7 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 
+#include <hev-task-dns.h>
 #include <hev-task-call.h>
 
 #include "hev-fsh-config.h"
@@ -359,7 +360,7 @@ resolv_entry (HevTaskCall *call)
     hints.ai_socktype = SOCK_STREAM;
     hints.ai_protocol = IPPROTO_TCP;
 
-    s = getaddrinfo (address, port, &hints, &res);
+    s = hev_task_dns_getaddrinfo (address, port, &hints, &res);
     if ((s != 0) || !res) {
         hev_task_call_set_retval (call, NULL);
         return;
