@@ -159,7 +159,7 @@ static void
 hev_fsh_server_stop (HevFshBase *base)
 {
     HevFshServer *self = HEV_FSH_SERVER (base);
-    int val;
+    int val = 0;
 
     if (self->event_fds[1] < 0)
         return;
