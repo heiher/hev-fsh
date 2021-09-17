@@ -2,12 +2,42 @@
 
 [![status](https://gitlab.com/hev/hev-fsh/badges/master/pipeline.svg)](https://gitlab.com/hev/hev-fsh/commits/master)
 
-HevFsh is a solution for connect to remote shell in local networks.
+Fsh is to help you access local Shell and TCP services behind NAT or firewall.
 
 **Features**
 * Shell.
 * TCP Port.
 * IPv4/IPv6. (dual stack)
+
+```
+    +-------------+      +-------------+
+    | Connector 1 |      | Connector 2 |
+    +-------------+      +-------------+
+           ^                    ^
+           |                    |
+           +------+      +------+
+           .      |      |      .
+           .      v      v      .
+           .     +--------+     .
+       (Token 1) | Server | (Token 2)
+           .     +--------+     .
+           .      ^      ^      .
+           .      |      |      .
+           +------+      +------+
+           |                    |
+           v                    v
+    +-------------+      +-------------+
+    | Forwarder A |      | Forwarder B |
+    |   (TCP)     |      |    (Term)   |
+    +-------------+      +-------------+
+           ^
+           |
+           v
+     +----------+
+     | Upstream |
+     |  Server  |
+     +----------+
+```
 
 ## How to Build
 ```bash
@@ -32,7 +62,7 @@ fsh -s 10.0.0.1:8000
 fsh -s -l /var/log/fsh.log
 ```
 
-**Forwarder** (A host in private network):
+**Forwarder**:
 * **Terminal**
     ```bash
     fsh -f [-u USER] SERVER_ADDR[:SERVER_PORT/TOKEN]
@@ -64,7 +94,7 @@ fsh -s -l /var/log/fsh.log
     fsh -f -p -b 192.168.0.1:22,192.168.1.3:80 10.0.0.1
     ```
 
-**Connector** (Another host in private network):
+**Connector**:
 * **Terminal**
     ```bash
     fsh SERVER_ADDR[:SERVER_PORT]/TOKEN
