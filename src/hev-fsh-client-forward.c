@@ -1,120 +1,55 @@
 /*
  ============================================================================
  Name        : hev-fsh-client-forward.c
- Author      : Heiher <r@hev.cc>
- Copyright   : Copyright (c) 2018 - 2020 everyone.
+ Author      : hev <r@hev.cc>
+ Copyright   : Copyright (c) 2018 - 2021 xyz
  Description : Fsh client forward
  ============================================================================
  */
 
-#include <errno.h>
-#include <stdio.h>
 #include <string.h>
-#include <unistd.h>
-#include <sys/types.h>
 
 #include <hev-task.h>
 #include <hev-task-io.h>
 #include <hev-task-io-socket.h>
 #include <hev-memory-allocator.h>
 
-#include "hev-fsh-protocol.h"
+#include "hev-logger.h"
 #include "hev-fsh-client-term-accept.h"
 #include "hev-fsh-client-port-accept.h"
 
 #include "hev-fsh-client-forward.h"
 
-#define fsh_task_io_yielder hev_fsh_session_task_io_yielder
-
-struct _HevFshClientForward
-{
-    HevFshClientBase base;
-
-    HevFshToken token;
-    HevFshSessionNotify notify;
-    void *notify_data;
-};
-
-static void hev_fsh_client_forward_task_entry (void *data);
-static void hev_fsh_client_forward_destroy (HevFshClientBase *self);
-
-HevFshClientBase *
-hev_fsh_client_forward_new (HevFshConfig *config, HevFshSessionManager *sm,
-                            HevFshSessionNotify notify, void *notify_data)
-{
-    HevFshClientForward *self;
-    HevFshSession *s;
-
-    self = hev_malloc0 (sizeof (HevFshClientForward));
-    if (!self) {
-        fprintf (stderr, "Allocate client forward failed!\n");
-        goto exit;
-    }
-
-    hev_fsh_client_base_init (&self->base, config, sm);
-
-    s = HEV_FSH_SESSION (self);
-    s->task = hev_task_new (HEV_FSH_CONFIG_TASK_STACK_SIZE);
-    if (!s->task) {
-        fprintf (stderr, "Create client forward's task failed!\n");
-        goto exit_free;
-    }
-
-    self->notify = notify;
-    self->notify_data = notify_data;
-    self->base._destroy = hev_fsh_client_forward_destroy;
-    hev_task_run (s->task, hev_fsh_client_forward_task_entry, self);
-    return &self->base;
-
-exit_free:
-    hev_fsh_client_base_destroy (&self->base);
-    hev_free (self);
-exit:
-    return NULL;
-}
-
-static void
-hev_fsh_client_forward_destroy (HevFshClientBase *self)
-{
-    hev_free (self);
-}
-
 static int
-task_io_yielder (HevTaskYieldType type, void *data)
+hev_fsh_client_forward_write_login (HevFshClientForward *self)
 {
-    HevFshSession *s = HEV_FSH_SESSION (data);
-
-    s->hp = HEV_FSH_SESSION_HP / 2;
-    hev_task_yield (type);
-
-    return (s->hp > 0) ? 0 : -1;
-}
-
-static int
-write_login (HevFshClientForward *self)
-{
-    HevFshMessage msg;
     const char *token = hev_fsh_config_get_token (self->base.config);
+    HevFshMessage msg;
+    int res;
+
+    LOG_D ("%p fsh client forward write login", self);
 
     msg.ver = token ? 2 : 1;
     msg.cmd = HEV_FSH_CMD_LOGIN;
-    if (hev_task_io_socket_send (self->base.fd, &msg, sizeof (msg), MSG_WAITALL,
-                                 fsh_task_io_yielder, self) <= 0)
+    res = hev_task_io_socket_send (self->base.fd, &msg, sizeof (msg),
+                                   MSG_WAITALL, io_yielder, self);
+    if (res <= 0)
         return -1;
 
     if (token) {
-        HevFshMessageToken msg_token;
+        HevFshMessageToken mtoken;
 
-        if (hev_fsh_protocol_token_from_string (self->token, token) < 0) {
-            fprintf (stderr, "Can't parse token!\n");
+        res = hev_fsh_protocol_token_from_string (self->token, token);
+        if (res < 0) {
+            LOG_E ("%p fsh client forward token", self);
             return -1;
         }
 
-        memcpy (msg_token.token, self->token, sizeof (HevFshToken));
+        memcpy (mtoken.token, self->token, sizeof (HevFshToken));
 
-        if (hev_task_io_socket_send (self->base.fd, &msg_token,
-                                     sizeof (msg_token), MSG_WAITALL,
-                                     fsh_task_io_yielder, self) <= 0)
+        res = hev_task_io_socket_send (self->base.fd, &mtoken, sizeof (mtoken),
+                                       MSG_WAITALL, io_yielder, self);
+        if (res <= 0)
             return -1;
     }
 
@@ -122,84 +57,101 @@ write_login (HevFshClientForward *self)
 }
 
 static int
-read_token (HevFshClientForward *self)
+hev_fsh_client_forward_read_token (HevFshClientForward *self)
 {
+    HevFshMessageToken token;
     HevFshMessage msg;
-    HevFshMessageToken msg_token;
     const char *src;
     char buf[40];
+    int res;
 
-    if (hev_task_io_socket_recv (self->base.fd, &msg, sizeof (msg), MSG_WAITALL,
-                                 fsh_task_io_yielder, self) <= 0)
+    LOG_D ("%p fsh client forward read token", self);
+
+    res = hev_task_io_socket_recv (self->base.fd, &msg, sizeof (msg),
+                                   MSG_WAITALL, io_yielder, self);
+    if (res <= 0)
         return -1;
 
     if (msg.cmd != HEV_FSH_CMD_TOKEN) {
-        fprintf (stderr, "Can't login to server!\n");
+        LOG_E ("%p fsh client forward login", self);
         return -1;
     }
 
-    if (hev_task_io_socket_recv (self->base.fd, &msg_token, sizeof (msg_token),
-                                 MSG_WAITALL, fsh_task_io_yielder, self) <= 0)
+    res = hev_task_io_socket_recv (self->base.fd, &token, sizeof (token),
+                                   MSG_WAITALL, io_yielder, self);
+    if (res <= 0)
         return -1;
 
-    hev_fsh_protocol_token_to_string (msg_token.token, buf);
-    if (memcmp (msg_token.token, self->token, sizeof (HevFshToken)) == 0) {
+    hev_fsh_protocol_token_to_string (token.token, buf);
+    if (memcmp (token.token, self->token, sizeof (HevFshToken)) == 0) {
         src = "client";
     } else {
         src = "server";
-        memcpy (self->token, msg_token.token, sizeof (HevFshToken));
+        memcpy (self->token, token.token, sizeof (HevFshToken));
     }
 
-    printf ("Token: %s (from %s)\n", buf, src);
+    if (LOG_ON_D ())
+        LOG_D ("%p fsh client forward token %s (from %s)", self, buf, src);
+    else
+        LOG_I ("token %s (from %s)", buf, src);
+
     return 0;
 }
 
 static int
-write_keep_alive (HevFshClientForward *self)
+hev_fsh_client_forward_write_keep_alive (HevFshClientForward *self)
 {
     HevFshMessage msg;
+
+    LOG_D ("%p fsh client forward keep alive", self);
 
     msg.ver = 2;
     msg.cmd = HEV_FSH_CMD_KEEP_ALIVE;
 
     return hev_task_io_socket_send (self->base.fd, &msg, sizeof (msg),
-                                    MSG_WAITALL, fsh_task_io_yielder, self);
+                                    MSG_WAITALL, io_yielder, self);
 }
 
 static void
 hev_fsh_client_forward_task_entry (void *data)
 {
-    HevFshClientForward *self = HEV_FSH_CLIENT_FORWARD (data);
-    HevFshClientBase *base = HEV_FSH_CLIENT_BASE (data);
+    HevFshClientForward *self = data;
+    HevFshClientBase *base = data;
     int keep_alive = 0;
+    int res;
 
-    if (hev_fsh_client_base_connect (base) < 0) {
-        fprintf (stderr, "Connect to server failed!\n");
-        goto exit;
+    res = hev_fsh_client_base_connect (base);
+    if (res < 0) {
+        LOG_E ("%p fsh client forward connect", self);
+        goto restart;
     }
 
-    if (write_login (self) < 0)
-        goto exit;
+    res = hev_fsh_client_forward_write_login (self);
+    if (res < 0)
+        goto restart;
 
-    if (read_token (self) < 0)
-        goto exit;
+    res = hev_fsh_client_forward_read_token (self);
+    if (res < 0)
+        goto restart;
 
     for (;;) {
-        HevFshMessageToken msg_token;
+        HevFshClientBase *accept;
+        HevFshMessageToken token;
         HevFshMessage msg;
-        ssize_t len;
         int mode;
+        int res;
 
-        len = hev_task_io_socket_recv (base->fd, &msg, sizeof (msg),
-                                       MSG_WAITALL, task_io_yielder, self);
-        if (len == -2) {
+        res = hev_task_io_socket_recv (base->fd, &msg, sizeof (msg),
+                                       MSG_WAITALL, io_yielder, self);
+        if (res == -2) {
             if (keep_alive++)
-                goto exit;
-            if (write_keep_alive (self) < 0)
-                goto exit;
+                goto restart;
+            res = hev_fsh_client_forward_write_keep_alive (self);
+            if (res < 0)
+                goto restart;
             continue;
-        } else if (len <= 0) {
-            goto exit;
+        } else if (res <= 0) {
+            goto restart;
         }
 
         switch (msg.cmd) {
@@ -209,34 +161,114 @@ hev_fsh_client_forward_task_entry (void *data)
             keep_alive = 0;
             continue;
         default:
-            goto exit;
+            goto restart;
         }
 
-        if (hev_task_io_socket_recv (base->fd, &msg_token, sizeof (msg_token),
-                                     MSG_WAITALL, fsh_task_io_yielder,
-                                     self) <= 0)
-            goto exit;
+        res = hev_task_io_socket_recv (base->fd, &token, sizeof (token),
+                                       MSG_WAITALL, io_yielder, self);
+        if (res <= 0)
+            goto restart;
 
-        if (memcmp (msg_token.token, self->token, sizeof (HevFshToken)) != 0)
-            goto exit;
+        res = memcmp (token.token, self->token, sizeof (HevFshToken));
+        if (res != 0)
+            goto restart;
 
         mode = hev_fsh_config_get_mode (base->config);
         if (HEV_FSH_CONFIG_MODE_FORWARDER_PORT == mode)
-            hev_fsh_client_port_accept_new (base->config, self->token,
-                                            base->sm);
+            accept = hev_fsh_client_port_accept_new (base->config, self->token);
         else
-            hev_fsh_client_term_accept_new (base->config, self->token,
-                                            base->sm);
+            accept = hev_fsh_client_term_accept_new (base->config, self->token);
 
-        if (write_keep_alive (self) < 0)
-            goto exit;
+        if (accept)
+            hev_fsh_io_run (HEV_FSH_IO (accept));
+
+        res = hev_fsh_client_forward_write_keep_alive (self);
+        if (res < 0)
+            goto restart;
     }
 
-exit:
-    if (self->notify) {
-        hev_task_del_fd (hev_task_self (), base->fd);
-        hev_task_sleep (1000);
-        self->notify (&base->base, self->notify_data);
+restart:
+    hev_object_unref (HEV_OBJECT (self));
+
+    hev_task_sleep (1000);
+    base = hev_fsh_client_forward_new (base->config);
+    hev_fsh_io_run (HEV_FSH_IO (base));
+}
+
+static void
+hev_fsh_client_forward_run (HevFshIO *base)
+{
+    LOG_D ("%p fsh client forward run", base);
+
+    hev_task_run (base->task, hev_fsh_client_forward_task_entry, base);
+}
+
+HevFshClientBase *
+hev_fsh_client_forward_new (HevFshConfig *config)
+{
+    HevFshClientForward *self;
+    int res;
+
+    self = hev_malloc0 (sizeof (HevFshClientForward));
+    if (!self)
+        return NULL;
+
+    res = hev_fsh_client_forward_construct (self, config);
+    if (res < 0) {
+        hev_free (self);
+        return NULL;
     }
-    hev_fsh_client_base_destroy (base);
+
+    LOG_D ("%p fsh client forward new", self);
+
+    return HEV_FSH_CLIENT_BASE (self);
+}
+
+int
+hev_fsh_client_forward_construct (HevFshClientForward *self,
+                                  HevFshConfig *config)
+{
+    int res;
+
+    res = hev_fsh_client_base_construct (&self->base, config);
+    if (res < 0)
+        return res;
+
+    LOG_D ("%p fsh client forward construct", self);
+
+    HEV_OBJECT (self)->klass = HEV_FSH_CLIENT_FORWARD_TYPE;
+
+    return 0;
+}
+
+static void
+hev_fsh_client_forward_destruct (HevObject *base)
+{
+    HevFshClientForward *self = HEV_FSH_CLIENT_FORWARD (base);
+
+    LOG_D ("%p fsh client forward destruct", self);
+
+    HEV_FSH_CLIENT_BASE_TYPE->finalizer (base);
+}
+
+HevObjectClass *
+hev_fsh_client_forward_class (void)
+{
+    static HevFshClientForwardClass klass;
+    HevFshClientForwardClass *kptr = &klass;
+    HevObjectClass *okptr = HEV_OBJECT_CLASS (kptr);
+
+    if (!okptr->name) {
+        HevFshIOClass *ikptr;
+
+        memcpy (kptr, HEV_FSH_CLIENT_BASE_TYPE, sizeof (HevFshClientBaseClass));
+
+        okptr->name = "HevFshClientForward";
+        okptr->finalizer = hev_fsh_client_forward_destruct;
+
+        ikptr = HEV_FSH_IO_CLASS (kptr);
+        ikptr->run = hev_fsh_client_forward_run;
+    }
+
+    return okptr;
 }

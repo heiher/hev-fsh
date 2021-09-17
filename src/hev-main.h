@@ -1,8 +1,8 @@
 /*
  ============================================================================
  Name        : hev-main.h
- Author      : Heiher <r@hev.cc>
- Copyright   : Copyright (c) 2017 - 2020 everyone.
+ Author      : hev <r@hev.cc>
+ Copyright   : Copyright (c) 2017 - 2021 xyz
  Description : Main
  ============================================================================
  */

@@ -1,17 +1,15 @@
 /*
  ============================================================================
  Name        : hev-fsh-client-port-connect.c
- Author      : Heiher <r@hev.cc>
- Copyright   : Copyright (c) 2018 - 2020 everyone.
+ Author      : hev <r@hev.cc>
+ Copyright   : Copyright (c) 2018 - 2021 xyz
  Description : Fsh client port connect
  ============================================================================
  */
 
 #include <fcntl.h>
-#include <stdio.h>
 #include <string.h>
 #include <unistd.h>
-#include <sys/types.h>
 #include <arpa/inet.h>
 
 #include <hev-task.h>
@@ -19,107 +17,62 @@
 #include <hev-task-io-socket.h>
 #include <hev-memory-allocator.h>
 
+#include "hev-logger.h"
 #include "hev-fsh-protocol.h"
 
 #include "hev-fsh-client-port-connect.h"
 
-#define fsh_task_io_yielder hev_fsh_session_task_io_yielder
-
-struct _HevFshClientPortConnect
-{
-    HevFshClientConnect base;
-
-    int local_fd;
-};
-
-static void hev_fsh_client_port_connect_task_entry (void *data);
-static void hev_fsh_client_port_connect_destroy (HevFshClientConnect *base);
-
-HevFshClientBase *
-hev_fsh_client_port_connect_new (HevFshConfig *config, int local_fd,
-                                 HevFshSessionManager *sm)
-{
-    HevFshClientPortConnect *self;
-    HevFshSession *s;
-
-    self = hev_malloc0 (sizeof (HevFshClientPortConnect));
-    if (!self) {
-        fprintf (stderr, "Allocate client port connect failed!\n");
-        goto exit;
-    }
-
-    if (hev_fsh_client_connect_construct (&self->base, config, sm) < 0) {
-        fprintf (stderr, "Construct client connect failed!\n");
-        goto exit_free;
-    }
-
-    s = HEV_FSH_SESSION (self);
-    hev_task_run (s->task, hev_fsh_client_port_connect_task_entry, self);
-
-    self->local_fd = local_fd;
-    self->base._destroy = hev_fsh_client_port_connect_destroy;
-    return &self->base.base;
-
-exit_free:
-    hev_free (self);
-exit:
-    return NULL;
-}
-
-static void
-hev_fsh_client_port_connect_destroy (HevFshClientConnect *base)
-{
-    HevFshClientPortConnect *self = HEV_FSH_CLIENT_PORT_CONNECT (base);
-
-    if (self->local_fd >= 0)
-        close (self->local_fd);
-    hev_free (self);
-}
-
 static void
 hev_fsh_client_port_connect_task_entry (void *data)
 {
-    HevFshClientPortConnect *self = HEV_FSH_CLIENT_PORT_CONNECT (data);
-    HevFshClientBase *base = HEV_FSH_CLIENT_BASE (self);
+    HevFshClientPortConnect *self = data;
+    HevFshClientBase *base = data;
+    HevFshMessagePortInfo mpinfo;
     HevTask *task = hev_task_self ();
-    HevFshMessagePortInfo msg_pinfo;
-    int ifd, ofd, port;
     const char *addr;
+    int port;
+    int ifd;
+    int ofd;
+    int res;
 
-    if (hev_fsh_client_connect_send_connect (&self->base) < 0)
+    res = hev_fsh_client_connect_send_connect (&self->base);
+    if (res < 0)
         goto exit;
 
     addr = hev_fsh_config_get_remote_address (base->config);
     port = hev_fsh_config_get_remote_port (base->config);
 
-    __builtin_bzero (msg_pinfo.addr, sizeof (msg_pinfo.addr));
-    msg_pinfo.port = htons (port);
+    __builtin_bzero (mpinfo.addr, sizeof (mpinfo.addr));
+    mpinfo.port = htons (port);
 
-    if (inet_pton (AF_INET, addr, msg_pinfo.addr) == 1) {
-        msg_pinfo.type = 4;
+    if (inet_pton (AF_INET, addr, mpinfo.addr) == 1) {
+        mpinfo.type = 4;
     } else {
-        msg_pinfo.type = 6;
-        inet_pton (AF_INET6, addr, msg_pinfo.addr);
+        mpinfo.type = 6;
+        inet_pton (AF_INET6, addr, mpinfo.addr);
     }
 
     /* send message port info */
-    if (hev_task_io_socket_send (base->fd, &msg_pinfo, sizeof (msg_pinfo),
-                                 MSG_WAITALL, fsh_task_io_yielder, self) <= 0)
+    res = hev_task_io_socket_send (base->fd, &mpinfo, sizeof (mpinfo),
+                                   MSG_WAITALL, io_yielder, self);
+    if (res <= 0)
         goto exit;
 
-    if (self->local_fd < 0) {
+    if (self->fd < 0) {
         ifd = 0;
         ofd = 1;
     } else {
-        ifd = self->local_fd;
-        ofd = self->local_fd;
+        ifd = self->fd;
+        ofd = self->fd;
     }
 
-    if (fcntl (ifd, F_SETFL, O_NONBLOCK) < 0)
+    res = fcntl (ifd, F_SETFL, O_NONBLOCK);
+    if (res < 0)
         goto exit;
 
     if (ifd != ofd) {
-        if (fcntl (ofd, F_SETFL, O_NONBLOCK) < 0)
+        res = fcntl (ofd, F_SETFL, O_NONBLOCK);
+        if (res < 0)
             goto exit;
 
         hev_task_add_fd (task, ifd, POLLIN);
@@ -128,9 +81,93 @@ hev_fsh_client_port_connect_task_entry (void *data)
         hev_task_add_fd (task, ifd, POLLIN | POLLOUT);
     }
 
-    hev_task_io_splice (base->fd, base->fd, ifd, ofd, 8192, fsh_task_io_yielder,
-                        self);
+    hev_task_io_splice (base->fd, base->fd, ifd, ofd, 8192, io_yielder, self);
 
 exit:
-    hev_fsh_client_base_destroy (base);
+    hev_object_unref (HEV_OBJECT (self));
+}
+
+static void
+hev_fsh_client_port_connect_run (HevFshIO *base)
+{
+    LOG_D ("%p fsh client port connect run", base);
+
+    hev_task_run (base->task, hev_fsh_client_port_connect_task_entry, base);
+}
+
+HevFshClientBase *
+hev_fsh_client_port_connect_new (HevFshConfig *config, int fd)
+{
+    HevFshClientPortConnect *self;
+    int res;
+
+    self = hev_malloc0 (sizeof (HevFshClientPortConnect));
+    if (!self)
+        return NULL;
+
+    res = hev_fsh_client_port_connect_construct (self, config, fd);
+    if (res < 0) {
+        hev_free (self);
+        return NULL;
+    }
+
+    LOG_D ("%p fsh client port connect new", self);
+
+    return HEV_FSH_CLIENT_BASE (self);
+}
+
+int
+hev_fsh_client_port_connect_construct (HevFshClientPortConnect *self,
+                                       HevFshConfig *config, int fd)
+{
+    int res;
+
+    res = hev_fsh_client_connect_construct (&self->base, config);
+    if (res < 0)
+        return res;
+
+    LOG_D ("%p fsh client port connect construct", self);
+
+    HEV_OBJECT (self)->klass = HEV_FSH_CLIENT_PORT_CONNECT_TYPE;
+
+    self->fd = fd;
+
+    return 0;
+}
+
+static void
+hev_fsh_client_port_connect_destruct (HevObject *base)
+{
+    HevFshClientPortConnect *self = HEV_FSH_CLIENT_PORT_CONNECT (base);
+
+    LOG_D ("%p fsh client port connect destruct", self);
+
+    if (self->fd >= 0)
+        close (self->fd);
+
+    HEV_FSH_CLIENT_CONNECT_TYPE->finalizer (base);
+}
+
+HevObjectClass *
+hev_fsh_client_port_connect_class (void)
+{
+    static HevFshClientPortConnectClass klass;
+    HevFshClientPortConnectClass *kptr = &klass;
+    HevObjectClass *okptr = HEV_OBJECT_CLASS (kptr);
+
+    if (!okptr->name) {
+        HevFshIOClass *ikptr;
+        void *ptr;
+
+        ptr = HEV_FSH_CLIENT_CONNECT_TYPE;
+        memcpy (kptr, ptr, sizeof (HevFshClientConnectClass));
+
+        okptr->name = "HevFshClientPortConnect";
+        okptr->finalizer = hev_fsh_client_port_connect_destruct;
+
+        ikptr = HEV_FSH_IO_CLASS (kptr);
+        ikptr->run = hev_fsh_client_port_connect_run;
+    }
+
+    return okptr;
 }

@@ -1,8 +1,8 @@
 /*
  ============================================================================
  Name        : hev-fsh-config.c
- Author      : Heiher <r@hev.cc>
- Copyright   : Copyright (c) 2018 - 2020 everyone.
+ Author      : hev <r@hev.cc>
+ Copyright   : Copyright (c) 2018 - 2021 xyz
  Description : Fsh Config
  ============================================================================
  */
@@ -28,14 +28,15 @@ struct _HevFshConfig
 {
     int mode;
     int ip_type;
+    int log_level;
 
     const char *server_address;
     const char *server_port;
     unsigned int timeout;
 
-    const char *log;
     const char *user;
     const char *token;
+    const char *log_path;
 
     HevFshAddrListNode *addr_list;
 
@@ -158,15 +159,27 @@ hev_fsh_config_set_token (HevFshConfig *self, const char *val)
 }
 
 const char *
-hev_fsh_config_get_log (HevFshConfig *self)
+hev_fsh_config_get_log_path (HevFshConfig *self)
 {
-    return self->log;
+    return self->log_path;
 }
 
 void
-hev_fsh_config_set_log (HevFshConfig *self, const char *val)
+hev_fsh_config_set_log_path (HevFshConfig *self, const char *val)
 {
-    self->log = val;
+    self->log_path = val;
+}
+
+int
+hev_fsh_config_get_log_level (HevFshConfig *self)
+{
+    return self->log_level;
+}
+
+void
+hev_fsh_config_set_log_level (HevFshConfig *self, int val)
+{
+    self->log_level = val;
 }
 
 int

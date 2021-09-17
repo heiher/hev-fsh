@@ -1,8 +1,8 @@
 /*
  ============================================================================
  Name        : hev-main.c
- Author      : Heiher <r@hev.cc>
- Copyright   : Copyright (c) 2017 - 2020 everyone.
+ Author      : hev <r@hev.cc>
+ Copyright   : Copyright (c) 2017 - 2021 xyz
  Description : Main
  ============================================================================
  */
@@ -20,6 +20,7 @@
 
 #include <hev-task-system.h>
 
+#include "hev-logger.h"
 #include "hev-fsh-config.h"
 #include "hev-fsh-server.h"
 #include "hev-fsh-client.h"
@@ -32,8 +33,8 @@ static void
 show_help (void)
 {
     fprintf (stderr,
-             "Common: [-4 | -6] [-t TIMEOUT]\n"
-             "Server: -s [-l LOG] [SERVER_ADDR:SERVER_PORT]\n"
+             "Common: [-4 | -6] [-t TIMEOUT] [-l LOG] [-v]\n"
+             "Server: -s [SERVER_ADDR:SERVER_PORT]\n"
              "Terminal:\n"
              "  Forwarder: -f [-u USER] SERVER_ADDR[:SERVER_PORT/TOKEN]\n"
              "  Connector: SERVER_ADDR[:SERVER_PORT]/TOKEN\n"
@@ -272,7 +273,7 @@ parse_set_addr_pair (HevFshConfig *config, const char *str)
 }
 
 static int
-parse_server (HevFshConfig *config, const char *sa, const char *log)
+parse_server (HevFshConfig *config, const char *sa)
 {
     if (sa) {
         const char *addr = NULL;
@@ -286,7 +287,6 @@ parse_server (HevFshConfig *config, const char *sa, const char *log)
             hev_fsh_config_set_server_port (config, port);
     }
 
-    hev_fsh_config_set_log (config, log);
     hev_fsh_config_set_mode (config, HEV_FSH_CONFIG_MODE_SERVER);
 
     return 0;
@@ -361,6 +361,7 @@ static int
 parse_args (HevFshConfig *config, int argc, char *argv[])
 {
     int opt;
+    int v = 0;
     int s = 0;
     int f = 0;
     int p = 0;
@@ -371,7 +372,7 @@ parse_args (HevFshConfig *config, int argc, char *argv[])
     const char *t1 = NULL;
     const char *t2 = NULL;
 
-    while ((opt = getopt (argc, argv, "46t:sfpl:u:w:b:")) != -1) {
+    while ((opt = getopt (argc, argv, "46t:vsfpl:u:w:b:")) != -1) {
         switch (opt) {
         case '4':
             hev_fsh_config_set_ip_type (config, 4);
@@ -381,6 +382,9 @@ parse_args (HevFshConfig *config, int argc, char *argv[])
             break;
         case 't':
             hev_fsh_config_set_timeout (config, strtoul (optarg, NULL, 10));
+            break;
+        case 'v':
+            v = 1;
             break;
         case 's':
             s = 1;
@@ -414,12 +418,18 @@ parse_args (HevFshConfig *config, int argc, char *argv[])
         t2 = argv[optind++];
 
     if (s) {
-        if (parse_server (config, t1, l) < 0)
+        if (parse_server (config, t1) < 0)
             return -1;
     } else {
         if (parse_client (config, f, p, t1, t2, w, b, u) < 0)
             return -1;
     }
+
+    hev_fsh_config_set_log_path (config, l);
+    if (v)
+        hev_fsh_config_set_log_level (config, HEV_LOGGER_DEBUG);
+    else
+        hev_fsh_config_set_log_level (config, HEV_LOGGER_INFO);
 
     return 0;
 }
@@ -431,35 +441,13 @@ signal_handler (int signum)
         hev_fsh_base_stop (instance);
 }
 
-static int
-setup_log (int mode, const char *log)
-{
-    int fd;
-
-    if (HEV_FSH_CONFIG_MODE_SERVER != mode || !log)
-        return 0;
-
-    /* redirect log */
-    fd = open (log, O_CREAT | O_APPEND | O_WRONLY, 0644);
-    if (fd == -1) {
-        fprintf (stderr, "Open log file %s failed!\n", log);
-        return -1;
-    }
-
-    close (1);
-    close (2);
-    dup2 (fd, 1);
-    dup2 (fd, 2);
-
-    return 0;
-}
-
 int
 main (int argc, char *argv[])
 {
     HevFshConfig *config = NULL;
     int mode;
-    const char *log;
+    int level;
+    const char *path;
 
     if (hev_task_system_init () < 0)
         return -1;
@@ -474,9 +462,10 @@ main (int argc, char *argv[])
     }
 
     mode = hev_fsh_config_get_mode (config);
-    log = hev_fsh_config_get_log (config);
+    path = hev_fsh_config_get_log_path (config);
+    level = hev_fsh_config_get_log_level (config);
 
-    if (setup_log (mode, log) < 0)
+    if (hev_logger_init (level, path) < 0)
         return -1;
 
     if (signal (SIGPIPE, SIG_IGN) == SIG_ERR)
@@ -498,9 +487,10 @@ main (int argc, char *argv[])
 
     hev_task_system_run ();
 
-    hev_fsh_base_destroy (instance);
+    hev_object_unref (HEV_OBJECT (instance));
     hev_fsh_config_destroy (config);
     hev_task_system_fini ();
+    hev_logger_fini ();
 
     return 0;
 }

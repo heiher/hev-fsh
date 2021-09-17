@@ -1,8 +1,8 @@
 /*
  ============================================================================
  Name        : hev-fsh-client-base.h
- Author      : Heiher <r@hev.cc>
- Copyright   : Copyright (c) 2018 - 2020 everyone.
+ Author      : hev <r@hev.cc>
+ Copyright   : Copyright (c) 2018 - 2021 xyz
  Description : Fsh client base
  ============================================================================
  */
@@ -10,32 +10,43 @@
 #ifndef __HEV_FSH_CLIENT_BASE_H__
 #define __HEV_FSH_CLIENT_BASE_H__
 
+#include "hev-fsh-io.h"
 #include "hev-fsh-config.h"
-#include "hev-fsh-session.h"
-#include "hev-fsh-session-manager.h"
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 #define HEV_FSH_CLIENT_BASE(p) ((HevFshClientBase *)p)
+#define HEV_FSH_CLIENT_BASE_CLASS(p) ((HevFshClientBaseClass *)p)
+#define HEV_FSH_CLIENT_BASE_TYPE (hev_fsh_client_base_class ())
 
 typedef struct _HevFshClientBase HevFshClientBase;
-typedef void (*HevFshClientBaseDestroy) (HevFshClientBase *self);
+typedef struct _HevFshClientBaseClass HevFshClientBaseClass;
 
 struct _HevFshClientBase
 {
-    HevFshSession base;
+    HevFshIO base;
 
     int fd;
     HevFshConfig *config;
-    HevFshSessionManager *sm;
-
-    /* private */
-    HevFshClientBaseDestroy _destroy;
 };
 
-void hev_fsh_client_base_init (HevFshClientBase *self, HevFshConfig *config,
-                               HevFshSessionManager *sm);
-void hev_fsh_client_base_destroy (HevFshClientBase *self);
+struct _HevFshClientBaseClass
+{
+    HevFshIOClass base;
+};
+
+HevObjectClass *hev_fsh_client_base_class (void);
+
+int hev_fsh_client_base_construct (HevFshClientBase *self,
+                                   HevFshConfig *config);
 
 int hev_fsh_client_base_listen (HevFshClientBase *self);
 int hev_fsh_client_base_connect (HevFshClientBase *self);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* __HEV_FSH_CLIENT_BASE_H__ */

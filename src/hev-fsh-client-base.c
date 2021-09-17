@@ -1,8 +1,8 @@
 /*
  ============================================================================
  Name        : hev-fsh-client-base.c
- Author      : Heiher <r@hev.cc>
- Copyright   : Copyright (c) 2018 - 2020 everyone.
+ Author      : hev <r@hev.cc>
+ Copyright   : Copyright (c) 2018 - 2021 xyz
  Description : Fsh client base
  ============================================================================
  */
@@ -17,57 +17,39 @@
 #include <hev-task.h>
 #include <hev-task-io.h>
 #include <hev-task-io-socket.h>
+#include <hev-memory-allocator.h>
+
+#include "hev-logger.h"
 
 #include "hev-fsh-client-base.h"
 
-#define fsh_task_io_yielder hev_fsh_session_task_io_yielder
-
-void
-hev_fsh_client_base_init (HevFshClientBase *self, HevFshConfig *config,
-                          HevFshSessionManager *sm)
-{
-    self->fd = -1;
-    self->sm = sm;
-    self->config = config;
-    self->base.hp = HEV_FSH_SESSION_HP;
-    hev_fsh_session_manager_insert (sm, &self->base);
-    signal (SIGCHLD, SIG_IGN);
-}
-
-void
-hev_fsh_client_base_destroy (HevFshClientBase *self)
-{
-    if (self->fd >= 0)
-        close (self->fd);
-    hev_fsh_session_manager_remove (self->sm, &self->base);
-
-    if (self->_destroy)
-        self->_destroy (self);
-}
-
 static int
-client_base_socket (int family)
+hev_fsh_client_base_socket (HevFshClientBase *self, int family)
 {
-    int fd, flags;
+    int flags;
+    int res;
+    int fd;
 
     fd = hev_task_io_socket_socket (family, SOCK_STREAM, IPPROTO_TCP);
     if (fd < 0)
-        goto exit;
+        return -1;
 
     flags = fcntl (fd, F_GETFD);
-    if (flags < 0)
-        goto exit_close;
+    if (flags < 0) {
+        LOG_E ("%p fsh client base fcntl", self);
+        close (fd);
+        return -1;
+    }
 
     flags |= FD_CLOEXEC;
-    if (fcntl (fd, F_SETFD, flags) < 0)
-        goto exit_close;
+    res = fcntl (fd, F_SETFD, flags);
+    if (res < 0) {
+        LOG_E ("%p fsh client base cloexec", self);
+        close (fd);
+        return -1;
+    }
 
     return fd;
-
-exit_close:
-    close (fd);
-exit:
-    return -1;
 }
 
 int
@@ -76,25 +58,41 @@ hev_fsh_client_base_listen (HevFshClientBase *self)
     struct sockaddr *addr;
     socklen_t addr_len;
     int one = 1;
+    int res;
+    int fd;
 
     addr = hev_fsh_config_get_local_sockaddr (self->config, &addr_len);
-    if (!addr)
+    if (!addr) {
+        LOG_E ("%p fsh client base addr", self);
+        return -1;
+    }
+
+    fd = hev_fsh_client_base_socket (self, addr->sa_family);
+    if (fd < 0)
         return -1;
 
-    self->fd = client_base_socket (addr->sa_family);
-    if (self->fd < 0)
+    res = setsockopt (fd, SOL_SOCKET, SO_REUSEADDR, &one, sizeof (one));
+    if (res < 0) {
+        LOG_E ("%p fsh client base reuse", self);
         return -1;
+    }
 
-    if (setsockopt (self->fd, SOL_SOCKET, SO_REUSEADDR, &one, sizeof (one)) < 0)
+    res = bind (fd, addr, addr_len);
+    if (res < 0) {
+        LOG_E ("%p fsh client base bind", self);
+        close (fd);
         return -1;
+    }
 
-    if (bind (self->fd, addr, addr_len) < 0)
+    res = listen (fd, 10);
+    if (res < 0) {
+        LOG_E ("%p fsh client base listen", self);
+        close (fd);
         return -1;
+    }
 
-    if (listen (self->fd, 10) < 0)
-        return -1;
-
-    hev_task_add_fd (hev_task_self (), self->fd, POLLIN);
+    hev_task_add_fd (hev_task_self (), fd, POLLIN);
+    self->fd = fd;
 
     return 0;
 }
@@ -104,20 +102,81 @@ hev_fsh_client_base_connect (HevFshClientBase *self)
 {
     struct sockaddr *addr;
     socklen_t addr_len;
+    int res;
+    int fd;
 
     addr = hev_fsh_config_get_server_sockaddr (self->config, &addr_len);
-    if (!addr)
+    if (!addr) {
+        LOG_E ("%p fsh client base addr", self);
+        return -1;
+    }
+
+    fd = hev_fsh_client_base_socket (self, addr->sa_family);
+    if (fd < 0)
         return -1;
 
-    self->fd = client_base_socket (addr->sa_family);
-    if (self->fd < 0)
-        return -1;
+    hev_task_add_fd (hev_task_self (), fd, POLLIN | POLLOUT);
 
-    hev_task_add_fd (hev_task_self (), self->fd, POLLIN | POLLOUT);
-
-    if (hev_task_io_socket_connect (self->fd, addr, addr_len,
-                                    fsh_task_io_yielder, self) < 0)
+    res = hev_task_io_socket_connect (fd, addr, addr_len, io_yielder, self);
+    if (res < 0) {
+        LOG_E ("%p fsh client base connect", self);
+        close (fd);
         return -1;
+    }
+
+    self->fd = fd;
 
     return 0;
+}
+
+int
+hev_fsh_client_base_construct (HevFshClientBase *self, HevFshConfig *config)
+{
+    int res;
+    unsigned int timeout;
+
+    timeout = hev_fsh_config_get_timeout (config);
+    res = hev_fsh_io_construct (&self->base, timeout);
+    if (res < 0)
+        return res;
+
+    LOG_D ("%p fsh client base construct", self);
+
+    HEV_OBJECT (self)->klass = HEV_FSH_CLIENT_BASE_TYPE;
+
+    self->fd = -1;
+    self->config = config;
+    signal (SIGCHLD, SIG_IGN);
+
+    return 0;
+}
+
+static void
+hev_fsh_client_base_destruct (HevObject *base)
+{
+    HevFshClientBase *self = HEV_FSH_CLIENT_BASE (base);
+
+    LOG_D ("%p fsh client base destruct", self);
+
+    if (self->fd >= 0)
+        close (self->fd);
+
+    HEV_FSH_IO_TYPE->finalizer (base);
+}
+
+HevObjectClass *
+hev_fsh_client_base_class (void)
+{
+    static HevFshClientBaseClass klass;
+    HevFshClientBaseClass *kptr = &klass;
+    HevObjectClass *okptr = HEV_OBJECT_CLASS (kptr);
+
+    if (!okptr->name) {
+        memcpy (kptr, HEV_FSH_IO_TYPE, sizeof (HevFshIOClass));
+
+        okptr->name = "HevFshClientBase";
+        okptr->finalizer = hev_fsh_client_base_destruct;
+    }
+
+    return okptr;
 }

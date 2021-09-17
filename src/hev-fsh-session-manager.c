@@ -1,155 +1,142 @@
 /*
  ============================================================================
  Name        : hev-fsh-session-manager.c
- Author      : Heiher <r@hev.cc>
- Copyright   : Copyright (c) 2020 everyone.
+ Author      : hev <r@hev.cc>
+ Copyright   : Copyright (c) 2021 xyz
  Description : Fsh session manager
  ============================================================================
  */
 
-#include <stdio.h>
+#include <string.h>
 
-#include <hev-task-mutex.h>
 #include <hev-memory-allocator.h>
 
-#include "hev-fsh-config.h"
+#include "hev-logger.h"
+#include "hev-compiler.h"
 #include "hev-fsh-session.h"
 
 #include "hev-fsh-session-manager.h"
 
-struct _HevFshSessionManager
-{
-    HevTask *task;
-    HevFshSession *sessions;
-    HevTaskMutex mutex;
-
-    int quit;
-    int timeout;
-    int autostop;
-};
-
-static void hev_fsh_session_manager_task_entry (void *data);
-
-HevFshSessionManager *
-hev_fsh_session_manager_new (int timeout, int autostop)
-{
-    HevFshSessionManager *self;
-
-    self = hev_malloc0 (sizeof (HevFshSessionManager));
-    if (!self) {
-        fprintf (stderr, "Allocate session manager failed!\n");
-        goto exit;
-    }
-
-    self->task = hev_task_new (HEV_FSH_CONFIG_TASK_STACK_SIZE);
-    if (!self->task) {
-        fprintf (stderr, "Create session manager's task failed!\n");
-        goto exit_free;
-    }
-
-    if (timeout <= HEV_FSH_SESSION_HP)
-        self->timeout = 1;
-    else
-        self->timeout = timeout / HEV_FSH_SESSION_HP;
-
-    self->autostop = autostop;
-    hev_task_mutex_init (&self->mutex);
-
-    return self;
-
-exit_free:
-    hev_free (self);
-exit:
-    return NULL;
-}
-
-void
-hev_fsh_session_manager_destroy (HevFshSessionManager *self)
-{
-    hev_task_unref (self->task);
-    hev_free (self);
-}
-
-void
-hev_fsh_session_manager_start (HevFshSessionManager *self)
-{
-    hev_task_ref (self->task);
-    hev_task_run (self->task, hev_fsh_session_manager_task_entry, self);
-}
-
-void
-hev_fsh_session_manager_stop (HevFshSessionManager *self)
-{
-    self->quit = 1;
-    hev_task_wakeup (self->task);
-}
-
 void
 hev_fsh_session_manager_insert (HevFshSessionManager *self, HevFshSession *s)
 {
-#ifdef _DEBUG
-    printf ("Insert session: %p\n", s);
-#endif
-    s->prev = NULL;
-    s->next = self->sessions;
-    if (self->sessions)
-        self->sessions->prev = s;
-    self->sessions = s;
+    HevRBTreeNode **n = &self->tree.root, *parent = NULL;
+
+    while (*n) {
+        HevFshSession *t = container_of (*n, HevFshSession, node);
+
+        parent = *n;
+
+        if (s->type < t->type) {
+            n = &((*n)->left);
+        } else if (s->type > t->type) {
+            n = &((*n)->right);
+        } else {
+            if (memcmp (s->token, t->token, sizeof (HevFshToken)) < 0)
+                n = &((*n)->left);
+            else
+                n = &((*n)->right);
+        }
+    }
+
+    hev_rbtree_node_link (&s->node, parent, n);
+    hev_rbtree_insert_color (&self->tree, &s->node);
 }
 
 void
 hev_fsh_session_manager_remove (HevFshSessionManager *self, HevFshSession *s)
 {
-    hev_task_mutex_lock (&self->mutex);
-#ifdef _DEBUG
-    printf ("Remove session: %p\n", s);
-#endif
-    if (s->prev) {
-        s->prev->next = s->next;
-    } else {
-        self->sessions = s->next;
-    }
-    if (s->next) {
-        s->next->prev = s->prev;
-    }
-    hev_task_mutex_unlock (&self->mutex);
+    hev_rbtree_erase (&self->tree, &s->node);
+}
 
-    if (self->autostop && !self->sessions)
-        hev_fsh_session_manager_stop (self);
+HevFshSession *
+hev_fsh_session_manager_find (HevFshSessionManager *self, int type,
+                              HevFshToken *token)
+{
+    HevRBTreeNode **n = &self->tree.root;
+
+    while (*n) {
+        HevFshSession *t = container_of (*n, HevFshSession, node);
+
+        if (type < t->type) {
+            n = &((*n)->left);
+        } else if (type > t->type) {
+            n = &((*n)->right);
+        } else {
+            int res = memcmp (*token, t->token, sizeof (HevFshToken));
+            if (res < 0)
+                n = &((*n)->left);
+            else if (res > 0)
+                n = &((*n)->right);
+            else
+                return t;
+        }
+    }
+
+    return NULL;
+}
+
+HevFshSessionManager *
+hev_fsh_session_manager_new (void)
+{
+    HevFshSessionManager *self;
+    int res;
+
+    self = hev_malloc0 (sizeof (HevFshSessionManager));
+    if (!self)
+        return NULL;
+
+    res = hev_fsh_session_manager_construct (self);
+    if (res < 0) {
+        hev_free (self);
+        return NULL;
+    }
+
+    LOG_D ("%p fsh session manager new", self);
+
+    return self;
+}
+
+int
+hev_fsh_session_manager_construct (HevFshSessionManager *self)
+{
+    int res;
+
+    res = hev_object_construct (&self->base);
+    if (res < 0)
+        return res;
+
+    LOG_D ("%p fsh session manager construct", self);
+
+    HEV_OBJECT (self)->klass = HEV_FSH_SESSION_MANAGER_TYPE;
+
+    return 0;
 }
 
 static void
-hev_fsh_session_manager_task_entry (void *data)
+hev_fsh_session_manager_destruct (HevObject *base)
 {
-    HevFshSessionManager *self = data;
+    HevFshSessionManager *self = HEV_FSH_SESSION_MANAGER (base);
 
-    for (; !self->quit;) {
-        HevFshSession *s;
+    LOG_D ("%p fsh session manager destruct", self);
 
-        hev_task_sleep (self->timeout * 1000);
+    HEV_OBJECT_TYPE->finalizer (base);
+    hev_free (self);
+}
 
-        hev_task_mutex_lock (&self->mutex);
-#ifdef _DEBUG
-        printf ("Enumerating sessions ...\n");
-#endif
-        for (s = self->sessions; s; s = s->next) {
-#ifdef _DEBUG
-            printf ("Session %p's hp %d\n", s, s->hp);
-#endif
-            if (self->quit) {
-                s->hp = 0;
-            } else {
-                s->hp--;
-                if (s->hp > 0)
-                    continue;
-            }
+HevObjectClass *
+hev_fsh_session_manager_class (void)
+{
+    static HevFshSessionManagerClass klass;
+    HevFshSessionManagerClass *kptr = &klass;
+    HevObjectClass *okptr = HEV_OBJECT_CLASS (kptr);
 
-            hev_task_wakeup (s->task);
-#ifdef _DEBUG
-            printf ("Wakeup session %p's task %p\n", s, s->task);
-#endif
-            hev_task_yield (HEV_TASK_YIELD);
-        }
-        hev_task_mutex_unlock (&self->mutex);
+    if (!okptr->name) {
+        memcpy (kptr, HEV_OBJECT_TYPE, sizeof (HevObjectClass));
+
+        okptr->name = "HevFshSessionManager";
+        okptr->finalizer = hev_fsh_session_manager_destruct;
     }
+
+    return okptr;
 }

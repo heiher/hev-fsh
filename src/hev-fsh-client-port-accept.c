@@ -1,100 +1,60 @@
 /*
  ============================================================================
  Name        : hev-fsh-client-port-accept.c
- Author      : Heiher <r@hev.cc>
- Copyright   : Copyright (c) 2018 - 2020 everyone.
+ Author      : hev <r@hev.cc>
+ Copyright   : Copyright (c) 2018 - 2021 xyz
  Description : Fsh client port accept
  ============================================================================
  */
 
-#include <stdio.h>
 #include <string.h>
 #include <unistd.h>
-#include <sys/types.h>
-#include <arpa/inet.h>
 
 #include <hev-task.h>
 #include <hev-task-io.h>
 #include <hev-task-io-socket.h>
 #include <hev-memory-allocator.h>
 
+#include "hev-logger.h"
+
 #include "hev-fsh-client-port-accept.h"
-
-#define fsh_task_io_yielder hev_fsh_session_task_io_yielder
-
-struct _HevFshClientPortAccept
-{
-    HevFshClientAccept base;
-};
-
-static void hev_fsh_client_port_accept_task_entry (void *data);
-static void hev_fsh_client_port_accept_destroy (HevFshClientAccept *base);
-
-HevFshClientBase *
-hev_fsh_client_port_accept_new (HevFshConfig *config, HevFshToken token,
-                                HevFshSessionManager *sm)
-{
-    HevFshClientPortAccept *self;
-    HevFshSession *s;
-
-    self = hev_malloc0 (sizeof (HevFshClientPortAccept));
-    if (!self) {
-        fprintf (stderr, "Allocate client port accept failed!\n");
-        goto exit;
-    }
-
-    if (hev_fsh_client_accept_construct (&self->base, config, token, sm) < 0)
-        goto exit_free;
-
-    s = HEV_FSH_SESSION (self);
-    hev_task_run (s->task, hev_fsh_client_port_accept_task_entry, self);
-
-    self->base._destroy = hev_fsh_client_port_accept_destroy;
-    return &self->base.base;
-
-exit_free:
-    hev_free (self);
-exit:
-    return NULL;
-}
-
-static void
-hev_fsh_client_port_accept_destroy (HevFshClientAccept *base)
-{
-    hev_free (base);
-}
 
 static void
 hev_fsh_client_port_accept_task_entry (void *data)
 {
-    HevFshClientPortAccept *self = HEV_FSH_CLIENT_PORT_ACCEPT (data);
-    HevFshClientBase *base = HEV_FSH_CLIENT_BASE (data);
-    HevFshMessagePortInfo msg_pinfo;
+    HevFshClientPortAccept *self = data;
+    HevFshClientBase *base = data;
+    HevFshMessagePortInfo mpinfo;
     struct sockaddr_storage addr;
     socklen_t addr_len;
-    int rfd, lfd;
+    int lfd;
+    int rfd;
+    int res;
 
-    if (hev_fsh_client_accept_send_accept (&self->base) < 0)
+    res = hev_fsh_client_accept_send_accept (&self->base);
+    if (res < 0)
         goto quit;
 
     rfd = base->fd;
     /* recv message port info */
-    if (hev_task_io_socket_recv (rfd, &msg_pinfo, sizeof (msg_pinfo),
-                                 MSG_WAITALL, fsh_task_io_yielder, self) <= 0)
+    res = hev_task_io_socket_recv (rfd, &mpinfo, sizeof (mpinfo), MSG_WAITALL,
+                                   io_yielder, self);
+    if (res <= 0)
         goto quit;
 
-    if (!hev_fsh_config_addr_list_contains (base->config, msg_pinfo.type,
-                                            msg_pinfo.addr, msg_pinfo.port))
+    res = hev_fsh_config_addr_list_contains (base->config, mpinfo.type,
+                                             mpinfo.addr, mpinfo.port);
+    if (res == 0)
         goto quit;
 
-    switch (msg_pinfo.type) {
+    switch (mpinfo.type) {
     case 4: {
         struct sockaddr_in *addr4 = (struct sockaddr_in *)&addr;
         addr_len = sizeof (struct sockaddr_in);
         __builtin_bzero (addr4, addr_len);
         addr4->sin_family = AF_INET;
-        addr4->sin_port = msg_pinfo.port;
-        memcpy (&addr4->sin_addr, msg_pinfo.addr, sizeof (addr4->sin_addr));
+        addr4->sin_port = mpinfo.port;
+        memcpy (&addr4->sin_addr, mpinfo.addr, sizeof (addr4->sin_addr));
         break;
     }
     case 6: {
@@ -102,8 +62,8 @@ hev_fsh_client_port_accept_task_entry (void *data)
         addr_len = sizeof (struct sockaddr_in6);
         __builtin_bzero (addr6, addr_len);
         addr6->sin6_family = AF_INET6;
-        addr6->sin6_port = msg_pinfo.port;
-        memcpy (&addr6->sin6_addr, msg_pinfo.addr, sizeof (addr6->sin6_addr));
+        addr6->sin6_port = mpinfo.port;
+        memcpy (&addr6->sin6_addr, mpinfo.addr, sizeof (addr6->sin6_addr));
         break;
     }
     default:
@@ -116,14 +76,95 @@ hev_fsh_client_port_accept_task_entry (void *data)
 
     hev_task_add_fd (hev_task_self (), lfd, POLLIN | POLLOUT);
 
-    if (hev_task_io_socket_connect (lfd, (struct sockaddr *)&addr, addr_len,
-                                    fsh_task_io_yielder, self) < 0)
-        goto quit_close_fd;
+    res = hev_task_io_socket_connect (lfd, (struct sockaddr *)&addr, addr_len,
+                                      io_yielder, self);
+    if (res < 0)
+        goto quit_close;
 
-    hev_task_io_splice (rfd, rfd, lfd, lfd, 8192, fsh_task_io_yielder, self);
+    hev_task_io_splice (rfd, rfd, lfd, lfd, 8192, io_yielder, self);
 
-quit_close_fd:
+quit_close:
     close (lfd);
 quit:
-    hev_fsh_client_base_destroy (base);
+    hev_object_unref (HEV_OBJECT (self));
+}
+
+static void
+hev_fsh_client_port_accept_run (HevFshIO *base)
+{
+    LOG_D ("%p fsh client port accept run", base);
+
+    hev_task_run (base->task, hev_fsh_client_port_accept_task_entry, base);
+}
+
+HevFshClientBase *
+hev_fsh_client_port_accept_new (HevFshConfig *config, HevFshToken token)
+{
+    HevFshClientPortAccept *self;
+    int res;
+
+    self = hev_malloc0 (sizeof (HevFshClientPortAccept));
+    if (!self)
+        return NULL;
+
+    res = hev_fsh_client_port_accept_construct (self, config, token);
+    if (res < 0) {
+        hev_free (self);
+        return NULL;
+    }
+
+    LOG_D ("%p fsh client port accept new", self);
+
+    return HEV_FSH_CLIENT_BASE (self);
+}
+
+int
+hev_fsh_client_port_accept_construct (HevFshClientPortAccept *self,
+                                      HevFshConfig *config, HevFshToken token)
+{
+    int res;
+
+    res = hev_fsh_client_accept_construct (&self->base, config, token);
+    if (res < 0)
+        return res;
+
+    LOG_D ("%p fsh client port accept construct", self);
+
+    HEV_OBJECT (self)->klass = HEV_FSH_CLIENT_PORT_ACCEPT_TYPE;
+
+    return 0;
+}
+
+static void
+hev_fsh_client_port_accept_destruct (HevObject *base)
+{
+    HevFshClientPortAccept *self = HEV_FSH_CLIENT_PORT_ACCEPT (base);
+
+    LOG_D ("%p fsh client port accept destruct", self);
+
+    HEV_FSH_CLIENT_ACCEPT_TYPE->finalizer (base);
+}
+
+HevObjectClass *
+hev_fsh_client_port_accept_class (void)
+{
+    static HevFshClientPortAcceptClass klass;
+    HevFshClientPortAcceptClass *kptr = &klass;
+    HevObjectClass *okptr = HEV_OBJECT_CLASS (kptr);
+
+    if (!okptr->name) {
+        HevFshIOClass *ikptr;
+        void *ptr;
+
+        ptr = HEV_FSH_CLIENT_ACCEPT_TYPE;
+        memcpy (kptr, ptr, sizeof (HevFshClientAcceptClass));
+
+        okptr->name = "HevFshClientPortAccept";
+        okptr->finalizer = hev_fsh_client_port_accept_destruct;
+
+        ikptr = HEV_FSH_IO_CLASS (kptr);
+        ikptr->run = hev_fsh_client_port_accept_run;
+    }
+
+    return okptr;
 }

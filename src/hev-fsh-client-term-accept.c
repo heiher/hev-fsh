@@ -1,18 +1,16 @@
 /*
  ============================================================================
  Name        : hev-fsh-client-term-accept.c
- Author      : Heiher <r@hev.cc>
- Copyright   : Copyright (c) 2018 - 2020 everyone.
+ Author      : hev <r@hev.cc>
+ Copyright   : Copyright (c) 2018 - 2021 xyz
  Description : Fsh client term accept
  ============================================================================
  */
 
 #include <fcntl.h>
-#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
-#include <sys/types.h>
 #include <sys/ioctl.h>
 #include <pwd.h>
 #if defined(__linux__)
@@ -30,16 +28,12 @@
 #include <hev-task-io-socket.h>
 #include <hev-memory-allocator.h>
 
+#include "hev-logger.h"
+#include "hev-fsh-protocol.h"
+
 #include "hev-fsh-client-term-accept.h"
 
-#define fsh_task_io_yielder hev_fsh_session_task_io_yielder
-
 typedef struct _HevTaskCallForkPty HevTaskCallForkPty;
-
-struct _HevFshClientTermAccept
-{
-    HevFshClientAccept base;
-};
 
 struct _HevTaskCallForkPty
 {
@@ -49,43 +43,6 @@ struct _HevTaskCallForkPty
     HevFshConfig *config;
     HevFshMessageTermInfo *term_info;
 };
-
-static void hev_fsh_client_term_accept_task_entry (void *data);
-static void hev_fsh_client_term_accept_destroy (HevFshClientAccept *base);
-
-HevFshClientBase *
-hev_fsh_client_term_accept_new (HevFshConfig *config, HevFshToken token,
-                                HevFshSessionManager *sm)
-{
-    HevFshClientTermAccept *self;
-    HevFshSession *s;
-
-    self = hev_malloc0 (sizeof (HevFshClientTermAccept));
-    if (!self) {
-        fprintf (stderr, "Allocate client term accept failed!\n");
-        goto exit;
-    }
-
-    if (hev_fsh_client_accept_construct (&self->base, config, token, sm) < 0)
-        goto exit_free;
-
-    s = HEV_FSH_SESSION (self);
-    hev_task_run (s->task, hev_fsh_client_term_accept_task_entry, self);
-
-    self->base._destroy = hev_fsh_client_term_accept_destroy;
-    return &self->base.base;
-
-exit_free:
-    hev_free (self);
-exit:
-    return NULL;
-}
-
-static void
-hev_fsh_client_term_accept_destroy (HevFshClientAccept *base)
-{
-    hev_free (base);
-}
 
 static void
 exec_shell (HevFshConfig *config)
@@ -153,21 +110,25 @@ forkpty_entry (HevTaskCall *call)
 static void
 hev_fsh_client_term_accept_task_entry (void *data)
 {
-    HevFshClientTermAccept *self = HEV_FSH_CLIENT_TERM_ACCEPT (data);
-    HevFshClientBase *base = HEV_FSH_CLIENT_BASE (data);
-    HevFshMessageTermInfo msg_tinfo;
+    HevFshClientTermAccept *self = data;
+    HevFshClientBase *base = data;
+    HevFshMessageTermInfo mtinfo;
     HevTaskCallForkPty *fpty;
     HevTaskCall *call;
-    int sfd, pfd;
     void *ptr;
+    int sfd;
+    int pfd;
+    int res;
 
-    if (hev_fsh_client_accept_send_accept (&self->base) < 0)
+    res = hev_fsh_client_accept_send_accept (&self->base);
+    if (res < 0)
         goto quit;
 
     sfd = base->fd;
     /* recv msg term info */
-    if (hev_task_io_socket_recv (sfd, &msg_tinfo, sizeof (msg_tinfo),
-                                 MSG_WAITALL, fsh_task_io_yielder, self) <= 0)
+    res = hev_task_io_socket_recv (sfd, &mtinfo, sizeof (mtinfo), MSG_WAITALL,
+                                   io_yielder, self);
+    if (res <= 0)
         goto quit;
 
     call = hev_task_call_new (sizeof (HevTaskCallForkPty), 16384);
@@ -176,7 +137,7 @@ hev_fsh_client_term_accept_task_entry (void *data)
 
     fpty = (HevTaskCallForkPty *)call;
     fpty->pfd = &pfd;
-    fpty->term_info = &msg_tinfo;
+    fpty->term_info = &mtinfo;
     fpty->config = base->config;
 
     ptr = hev_task_call_jump (call, forkpty_entry);
@@ -184,14 +145,95 @@ hev_fsh_client_term_accept_task_entry (void *data)
     if (!ptr)
         goto quit;
 
-    if (fcntl (pfd, F_SETFL, O_NONBLOCK) < 0)
-        goto quit_close_fd;
+    res = fcntl (pfd, F_SETFL, O_NONBLOCK);
+    if (res < 0)
+        goto quit_close;
 
     hev_task_add_fd (hev_task_self (), pfd, POLLIN | POLLOUT);
-    hev_task_io_splice (sfd, sfd, pfd, pfd, 8192, fsh_task_io_yielder, self);
+    hev_task_io_splice (sfd, sfd, pfd, pfd, 8192, io_yielder, self);
 
-quit_close_fd:
+quit_close:
     close (pfd);
 quit:
-    hev_fsh_client_base_destroy (base);
+    hev_object_unref (HEV_OBJECT (self));
+}
+
+static void
+hev_fsh_client_term_accept_run (HevFshIO *base)
+{
+    LOG_D ("%p fsh client term accept run", base);
+
+    hev_task_run (base->task, hev_fsh_client_term_accept_task_entry, base);
+}
+
+HevFshClientBase *
+hev_fsh_client_term_accept_new (HevFshConfig *config, HevFshToken token)
+{
+    HevFshClientTermAccept *self;
+    int res;
+
+    self = hev_malloc0 (sizeof (HevFshClientTermAccept));
+    if (!self)
+        return NULL;
+
+    res = hev_fsh_client_term_accept_construct (self, config, token);
+    if (res < 0) {
+        hev_free (self);
+        return NULL;
+    }
+
+    LOG_D ("%p fsh client term accept new", self);
+
+    return HEV_FSH_CLIENT_BASE (self);
+}
+
+int
+hev_fsh_client_term_accept_construct (HevFshClientTermAccept *self,
+                                      HevFshConfig *config, HevFshToken token)
+{
+    int res;
+
+    res = hev_fsh_client_accept_construct (&self->base, config, token);
+    if (res < 0)
+        return res;
+
+    LOG_D ("%p fsh client term accept construct", self);
+
+    HEV_OBJECT (self)->klass = HEV_FSH_CLIENT_TERM_ACCEPT_TYPE;
+
+    return 0;
+}
+
+static void
+hev_fsh_client_term_accept_destruct (HevObject *base)
+{
+    HevFshClientTermAccept *self = HEV_FSH_CLIENT_TERM_ACCEPT (base);
+
+    LOG_D ("%p fsh client term accept destruct", self);
+
+    HEV_FSH_CLIENT_ACCEPT_TYPE->finalizer (base);
+}
+
+HevObjectClass *
+hev_fsh_client_term_accept_class (void)
+{
+    static HevFshClientTermAcceptClass klass;
+    HevFshClientTermAcceptClass *kptr = &klass;
+    HevObjectClass *okptr = HEV_OBJECT_CLASS (kptr);
+
+    if (!okptr->name) {
+        HevFshIOClass *ikptr;
+        void *ptr;
+
+        ptr = HEV_FSH_CLIENT_ACCEPT_TYPE;
+        memcpy (kptr, ptr, sizeof (HevFshClientAcceptClass));
+
+        okptr->name = "HevFshClientTermAccept";
+        okptr->finalizer = hev_fsh_client_term_accept_destruct;
+
+        ikptr = HEV_FSH_IO_CLASS (kptr);
+        ikptr->run = hev_fsh_client_term_accept_run;
+    }
+
+    return okptr;
 }

@@ -1,13 +1,12 @@
 /*
  ============================================================================
  Name        : hev-fsh-client-connect.c
- Author      : Heiher <r@hev.cc>
- Copyright   : Copyright (c) 2018 - 2020 everyone.
+ Author      : hev <r@hev.cc>
+ Copyright   : Copyright (c) 2018 - 2021 xyz
  Description : Fsh client connect
  ============================================================================
  */
 
-#include <stdio.h>
 #include <string.h>
 #include <unistd.h>
 #include <sys/types.h>
@@ -15,47 +14,11 @@
 #include <hev-task.h>
 #include <hev-task-io.h>
 #include <hev-task-io-socket.h>
-#include <hev-memory-allocator.h>
 
+#include "hev-logger.h"
 #include "hev-fsh-protocol.h"
 
 #include "hev-fsh-client-connect.h"
-
-#define fsh_task_io_yielder hev_fsh_session_task_io_yielder
-
-static void hev_fsh_client_connect_destroy (HevFshClientBase *base);
-
-int
-hev_fsh_client_connect_construct (HevFshClientConnect *self,
-                                  HevFshConfig *config,
-                                  HevFshSessionManager *sm)
-{
-    HevFshSession *s = HEV_FSH_SESSION (self);
-
-    hev_fsh_client_base_init (&self->base, config, sm);
-
-    s->task = hev_task_new (HEV_FSH_CONFIG_TASK_STACK_SIZE);
-    if (!s->task) {
-        fprintf (stderr, "Create client connect's task failed!\n");
-        goto exit;
-    }
-
-    self->base._destroy = hev_fsh_client_connect_destroy;
-    return 0;
-
-exit:
-    hev_fsh_client_base_destroy (&self->base);
-    return -1;
-}
-
-static void
-hev_fsh_client_connect_destroy (HevFshClientBase *base)
-{
-    HevFshClientConnect *self = HEV_FSH_CLIENT_CONNECT (base);
-
-    if (self->_destroy)
-        self->_destroy (self);
-}
 
 int
 hev_fsh_client_connect_send_connect (HevFshClientConnect *self)
@@ -64,9 +27,13 @@ hev_fsh_client_connect_send_connect (HevFshClientConnect *self)
     HevFshMessageToken msg_token;
     HevFshMessage msg;
     const char *token;
+    int res;
 
-    if (hev_fsh_client_base_connect (base) < 0) {
-        fprintf (stderr, "Connect to server failed!\n");
+    LOG_D ("%p fsh client connect send connect", self);
+
+    res = hev_fsh_client_base_connect (base);
+    if (res < 0) {
+        LOG_E ("%p fsh client connect connect", self);
         return -1;
     }
 
@@ -74,18 +41,65 @@ hev_fsh_client_connect_send_connect (HevFshClientConnect *self)
     msg.cmd = HEV_FSH_CMD_CONNECT;
     token = hev_fsh_config_get_token (base->config);
 
-    if (hev_task_io_socket_send (base->fd, &msg, sizeof (msg), MSG_WAITALL,
-                                 fsh_task_io_yielder, self) <= 0)
+    res = hev_task_io_socket_send (base->fd, &msg, sizeof (msg), MSG_WAITALL,
+                                   io_yielder, self);
+    if (res <= 0)
         return -1;
 
-    if (hev_fsh_protocol_token_from_string (msg_token.token, token) == -1) {
-        fprintf (stderr, "Can't parse token!\n");
+    res = hev_fsh_protocol_token_from_string (msg_token.token, token);
+    if (res == -1) {
+        LOG_E ("%p fsh client connect token", self);
         return -1;
     }
 
-    if (hev_task_io_socket_send (base->fd, &msg_token, sizeof (msg_token),
-                                 MSG_WAITALL, fsh_task_io_yielder, self) <= 0)
+    res = hev_task_io_socket_send (base->fd, &msg_token, sizeof (msg_token),
+                                   MSG_WAITALL, io_yielder, self);
+    if (res <= 0)
         return -1;
 
     return 0;
+}
+
+int
+hev_fsh_client_connect_construct (HevFshClientConnect *self,
+                                  HevFshConfig *config)
+{
+    int res;
+
+    res = hev_fsh_client_base_construct (&self->base, config);
+    if (res < 0)
+        return res;
+
+    LOG_D ("%p fsh client connect construct", self);
+
+    HEV_OBJECT (self)->klass = HEV_FSH_CLIENT_CONNECT_TYPE;
+
+    return 0;
+}
+
+static void
+hev_fsh_client_connect_destruct (HevObject *base)
+{
+    HevFshClientConnect *self = HEV_FSH_CLIENT_CONNECT (base);
+
+    LOG_D ("%p fsh client connect destruct", self);
+
+    HEV_FSH_CLIENT_BASE_TYPE->finalizer (base);
+}
+
+HevObjectClass *
+hev_fsh_client_connect_class (void)
+{
+    static HevFshClientConnectClass klass;
+    HevFshClientConnectClass *kptr = &klass;
+    HevObjectClass *okptr = HEV_OBJECT_CLASS (kptr);
+
+    if (!okptr->name) {
+        memcpy (kptr, HEV_FSH_CLIENT_BASE_TYPE, sizeof (HevFshClientBaseClass));
+
+        okptr->name = "HevFshClientConnect";
+        okptr->finalizer = hev_fsh_client_connect_destruct;
+    }
+
+    return okptr;
 }

@@ -1,18 +1,16 @@
 /*
  ============================================================================
  Name        : hev-fsh-client-term-connect.c
- Author      : Heiher <r@hev.cc>
- Copyright   : Copyright (c) 2018 - 2020 everyone.
+ Author      : hev <r@hev.cc>
+ Copyright   : Copyright (c) 2018 - 2021 xyz
  Description : Fsh client term connect
  ============================================================================
  */
 
 #include <fcntl.h>
-#include <stdio.h>
 #include <string.h>
 #include <unistd.h>
 #include <termios.h>
-#include <sys/types.h>
 #include <sys/ioctl.h>
 
 #include <hev-task.h>
@@ -20,100 +18,144 @@
 #include <hev-task-io-socket.h>
 #include <hev-memory-allocator.h>
 
+#include "hev-logger.h"
 #include "hev-fsh-protocol.h"
 
 #include "hev-fsh-client-term-connect.h"
 
-#define fsh_task_io_yielder hev_fsh_session_task_io_yielder
-
-struct _HevFshClientTermConnect
-{
-    HevFshClientConnect base;
-};
-
-static void hev_fsh_client_term_connect_task_entry (void *data);
-static void hev_fsh_client_term_connect_destroy (HevFshClientConnect *base);
-
-HevFshClientBase *
-hev_fsh_client_term_connect_new (HevFshConfig *config, HevFshSessionManager *sm)
-{
-    HevFshClientTermConnect *self;
-    HevFshSession *s;
-
-    self = hev_malloc0 (sizeof (HevFshClientTermConnect));
-    if (!self) {
-        fprintf (stderr, "Allocate client term connect failed!\n");
-        goto exit;
-    }
-
-    if (hev_fsh_client_connect_construct (&self->base, config, sm) < 0) {
-        fprintf (stderr, "Construct client connect failed!\n");
-        goto exit_free;
-    }
-
-    s = HEV_FSH_SESSION (self);
-    hev_task_run (s->task, hev_fsh_client_term_connect_task_entry, self);
-
-    self->base._destroy = hev_fsh_client_term_connect_destroy;
-    return &self->base.base;
-
-exit_free:
-    hev_free (self);
-exit:
-    return NULL;
-}
-
-static void
-hev_fsh_client_term_connect_destroy (HevFshClientConnect *base)
-{
-    hev_free (base);
-}
-
 static void
 hev_fsh_client_term_connect_task_entry (void *data)
 {
-    HevFshClientTermConnect *self = HEV_FSH_CLIENT_TERM_CONNECT (data);
-    HevFshMessageTermInfo msg_tinfo;
-    struct termios term, term_rsh;
+    HevFshClientTermConnect *self = data;
+    HevFshClientBase *base = data;
+    HevFshMessageTermInfo mtinfo;
     struct winsize win_size;
+    struct termios term_rsh;
+    struct termios term;
+    int res;
 
-    if (hev_fsh_client_connect_send_connect (&self->base) < 0)
+    res = hev_fsh_client_connect_send_connect (&self->base);
+    if (res < 0)
         goto exit;
 
-    if (ioctl (0, TIOCGWINSZ, &win_size) < 0)
+    res = ioctl (0, TIOCGWINSZ, &win_size);
+    if (res < 0)
         goto exit;
 
-    msg_tinfo.rows = win_size.ws_row;
-    msg_tinfo.columns = win_size.ws_col;
+    mtinfo.rows = win_size.ws_row;
+    mtinfo.columns = win_size.ws_col;
 
     /* send message term info */
-    if (hev_task_io_socket_send (self->base.base.fd, &msg_tinfo,
-                                 sizeof (msg_tinfo), MSG_WAITALL,
-                                 fsh_task_io_yielder, self) <= 0)
+    res = hev_task_io_socket_send (base->fd, &mtinfo, sizeof (mtinfo),
+                                   MSG_WAITALL, io_yielder, self);
+    if (res <= 0)
         goto exit;
 
-    if (fcntl (0, F_SETFL, O_NONBLOCK) < 0)
+    res = fcntl (0, F_SETFL, O_NONBLOCK);
+    if (res < 0)
         goto exit;
-    if (fcntl (1, F_SETFL, O_NONBLOCK) < 0)
+    res = fcntl (1, F_SETFL, O_NONBLOCK);
+    if (res < 0)
         goto exit;
 
     hev_task_add_fd (hev_task_self (), 0, POLLIN);
     hev_task_add_fd (hev_task_self (), 1, POLLOUT);
 
-    if (tcgetattr (0, &term) < 0)
+    res = tcgetattr (0, &term);
+    if (res < 0)
         goto exit;
 
     memcpy (&term_rsh, &term, sizeof (term));
     term_rsh.c_oflag &= ~(OPOST);
     term_rsh.c_lflag &= ~(ISIG | ICANON | IEXTEN | ECHO | ECHOE | ECHOK);
-    if (tcsetattr (0, TCSADRAIN, &term_rsh) < 0)
+    res = tcsetattr (0, TCSADRAIN, &term_rsh);
+    if (res < 0)
         goto exit;
 
-    hev_task_io_splice (self->base.base.fd, self->base.base.fd, 0, 1, 8192,
-                        fsh_task_io_yielder, self);
+    hev_task_io_splice (base->fd, base->fd, 0, 1, 8192, io_yielder, self);
 
     tcsetattr (0, TCSADRAIN, &term);
 
 exit:
-    hev_fsh_client_base_destroy (&self->base.base);
+    hev_object_unref (HEV_OBJECT (self));
+}
+
+static void
+hev_fsh_client_term_connect_run (HevFshIO *base)
+{
+    LOG_D ("%p fsh client term connect run", base);
+
+    hev_task_run (base->task, hev_fsh_client_term_connect_task_entry, base);
+}
+
+HevFshClientBase *
+hev_fsh_client_term_connect_new (HevFshConfig *config)
+{
+    HevFshClientTermConnect *self;
+    int res;
+
+    self = hev_malloc0 (sizeof (HevFshClientTermConnect));
+    if (!self)
+        return NULL;
+
+    res = hev_fsh_client_term_connect_construct (self, config);
+    if (res < 0) {
+        hev_free (self);
+        return NULL;
+    }
+
+    LOG_D ("%p fsh client term connect new", self);
+
+    return HEV_FSH_CLIENT_BASE (self);
+}
+
+int
+hev_fsh_client_term_connect_construct (HevFshClientTermConnect *self,
+                                       HevFshConfig *config)
+{
+    int res;
+
+    res = hev_fsh_client_connect_construct (&self->base, config);
+    if (res < 0)
+        return res;
+
+    LOG_D ("%p fsh client term connect construct", self);
+
+    HEV_OBJECT (self)->klass = HEV_FSH_CLIENT_TERM_CONNECT_TYPE;
+
+    return 0;
+}
+
+static void
+hev_fsh_client_term_connect_destruct (HevObject *base)
+{
+    HevFshClientTermConnect *self = HEV_FSH_CLIENT_TERM_CONNECT (base);
+
+    LOG_D ("%p fsh client term connect destruct", self);
+
+    HEV_FSH_CLIENT_CONNECT_TYPE->finalizer (base);
+}
+
+HevObjectClass *
+hev_fsh_client_term_connect_class (void)
+{
+    static HevFshClientTermConnectClass klass;
+    HevFshClientTermConnectClass *kptr = &klass;
+    HevObjectClass *okptr = HEV_OBJECT_CLASS (kptr);
+
+    if (!okptr->name) {
+        HevFshIOClass *ikptr;
+        void *ptr;
+
+        ptr = HEV_FSH_CLIENT_CONNECT_TYPE;
+        memcpy (kptr, ptr, sizeof (HevFshClientConnectClass));
+
+        okptr->name = "HevFshClientTermConnect";
+        okptr->finalizer = hev_fsh_client_term_connect_destruct;
+
+        ikptr = HEV_FSH_IO_CLASS (kptr);
+        ikptr->run = hev_fsh_client_term_connect_run;
+    }
+
+    return okptr;
 }

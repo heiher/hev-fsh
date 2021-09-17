@@ -1,31 +1,80 @@
 /*
  ============================================================================
  Name        : hev-fsh-base.c
- Author      : Heiher <r@hev.cc>
- Copyright   : Copyright (c) 2020 everyone.
+ Author      : hev <r@hev.cc>
+ Copyright   : Copyright (c) 2020 - 2021 xyz
  Description : Fsh base
  ============================================================================
  */
 
-#include "hev-fsh-base.h"
+#include <string.h>
 
-void
-hev_fsh_base_destroy (HevFshBase *self)
-{
-    if (self->_destroy)
-        self->_destroy (self);
-}
+#include <hev-memory-allocator.h>
+
+#include "hev-logger.h"
+
+#include "hev-fsh-base.h"
 
 void
 hev_fsh_base_start (HevFshBase *self)
 {
-    if (self->_start)
-        self->_start (self);
+    HevFshBaseClass *klass = HEV_OBJECT_GET_CLASS (self);
+
+    LOG_D ("%p fsh base start", self);
+
+    klass->start (self);
 }
 
 void
 hev_fsh_base_stop (HevFshBase *self)
 {
-    if (self->_stop)
-        self->_stop (self);
+    HevFshBaseClass *klass = HEV_OBJECT_GET_CLASS (self);
+
+    LOG_D ("%p fsh base stop", self);
+
+    klass->stop (self);
+}
+
+int
+hev_fsh_base_construct (HevFshBase *self)
+{
+    int res;
+
+    res = hev_object_construct (&self->base);
+    if (res < 0)
+        return res;
+
+    LOG_D ("%p fsh base construct", self);
+
+    HEV_OBJECT (self)->klass = HEV_FSH_BASE_TYPE;
+
+    return 0;
+}
+
+static void
+hev_fsh_base_destruct (HevObject *base)
+{
+    HevFshBase *self = HEV_FSH_BASE (base);
+
+    LOG_D ("%p fsh base destruct", self);
+
+    HEV_OBJECT_TYPE->finalizer (base);
+    hev_free (base);
+}
+
+HevObjectClass *
+hev_fsh_base_class (void)
+{
+    static HevFshBaseClass klass;
+    HevFshBaseClass *kptr = &klass;
+    HevObjectClass *okptr = HEV_OBJECT_CLASS (kptr);
+
+    if (!okptr->name) {
+        memcpy (kptr, HEV_OBJECT_TYPE, sizeof (HevObjectClass));
+
+        okptr->name = "HevFshBase";
+        okptr->finalizer = hev_fsh_base_destruct;
+    }
+
+    return okptr;
 }

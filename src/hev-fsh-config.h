@@ -1,8 +1,8 @@
 /*
  ============================================================================
  Name        : hev-fsh-config.h
- Author      : Heiher <r@hev.cc>
- Copyright   : Copyright (c) 2018 - 2020 everyone.
+ Author      : hev <r@hev.cc>
+ Copyright   : Copyright (c) 2018 - 2021 xyz
  Description : Fsh Config
  ============================================================================
  */
@@ -45,8 +45,11 @@ void hev_fsh_config_set_server_port (HevFshConfig *self, const char *val);
 const char *hev_fsh_config_get_token (HevFshConfig *self);
 void hev_fsh_config_set_token (HevFshConfig *self, const char *val);
 
-const char *hev_fsh_config_get_log (HevFshConfig *self);
-void hev_fsh_config_set_log (HevFshConfig *self, const char *val);
+const char *hev_fsh_config_get_log_path (HevFshConfig *self);
+void hev_fsh_config_set_log_path (HevFshConfig *self, const char *val);
+
+int hev_fsh_config_get_log_level (HevFshConfig *self);
+void hev_fsh_config_set_log_level (HevFshConfig *self, int val);
 
 int hev_fsh_config_get_ip_type (HevFshConfig *self);
 void hev_fsh_config_set_ip_type (HevFshConfig *self, int val);

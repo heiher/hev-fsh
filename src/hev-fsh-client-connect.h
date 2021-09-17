@@ -1,8 +1,8 @@
 /*
  ============================================================================
  Name        : hev-fsh-client-connect.h
- Author      : Heiher <r@hev.cc>
- Copyright   : Copyright (c) 2018 - 2020 everyone.
+ Author      : hev <r@hev.cc>
+ Copyright   : Copyright (c) 2018 - 2021 xyz
  Description : Fsh client connect
  ============================================================================
  */
@@ -12,25 +12,37 @@
 
 #include "hev-fsh-config.h"
 #include "hev-fsh-client-base.h"
-#include "hev-fsh-session-manager.h"
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 #define HEV_FSH_CLIENT_CONNECT(p) ((HevFshClientConnect *)p)
+#define HEV_FSH_CLIENT_CONNECT_CLASS(P) ((HevFshClientConnectClass *)p)
+#define HEV_FSH_CLIENT_CONNECT_TYPE (hev_fsh_client_connect_class ())
 
 typedef struct _HevFshClientConnect HevFshClientConnect;
-typedef void (*HevFshClientConnectDestroy) (HevFshClientConnect *self);
+typedef struct _HevFshClientConnectClass HevFshClientConnectClass;
 
 struct _HevFshClientConnect
 {
     HevFshClientBase base;
-
-    /* private */
-    HevFshClientConnectDestroy _destroy;
 };
 
+struct _HevFshClientConnectClass
+{
+    HevFshClientBaseClass base;
+};
+
+HevObjectClass *hev_fsh_client_connect_class (void);
+
 int hev_fsh_client_connect_construct (HevFshClientConnect *self,
-                                      HevFshConfig *config,
-                                      HevFshSessionManager *sm);
+                                      HevFshConfig *config);
 
 int hev_fsh_client_connect_send_connect (HevFshClientConnect *self);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* __HEV_FSH_CLIENT_CONNECT_H__ */

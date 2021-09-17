@@ -1,13 +1,12 @@
 /*
  ============================================================================
  Name        : hev-fsh-client-accept.c
- Author      : Heiher <r@hev.cc>
- Copyright   : Copyright (c) 2018 - 2020 everyone.
+ Author      : hev <r@hev.cc>
+ Copyright   : Copyright (c) 2018 - 2021 xyz
  Description : Fsh client accept
  ============================================================================
  */
 
-#include <stdio.h>
 #include <string.h>
 #include <sys/types.h>
 
@@ -15,43 +14,9 @@
 #include <hev-task-io.h>
 #include <hev-task-io-socket.h>
 
+#include "hev-logger.h"
+
 #include "hev-fsh-client-accept.h"
-
-#define fsh_task_io_yielder hev_fsh_session_task_io_yielder
-
-static void hev_fsh_client_accept_destroy (HevFshClientBase *base);
-
-int
-hev_fsh_client_accept_construct (HevFshClientAccept *self, HevFshConfig *config,
-                                 HevFshToken token, HevFshSessionManager *sm)
-{
-    HevFshSession *s = HEV_FSH_SESSION (self);
-
-    hev_fsh_client_base_init (&self->base, config, sm);
-
-    s->task = hev_task_new (HEV_FSH_CONFIG_TASK_STACK_SIZE);
-    if (!s->task) {
-        fprintf (stderr, "Create client accept's task failed!\n");
-        goto exit;
-    }
-
-    memcpy (self->token, token, sizeof (HevFshToken));
-    self->base._destroy = hev_fsh_client_accept_destroy;
-    return 0;
-
-exit:
-    hev_fsh_client_base_destroy (&self->base);
-    return -1;
-}
-
-static void
-hev_fsh_client_accept_destroy (HevFshClientBase *base)
-{
-    HevFshClientAccept *self = HEV_FSH_CLIENT_ACCEPT (base);
-
-    if (self->_destroy)
-        self->_destroy (self);
-}
 
 int
 hev_fsh_client_accept_send_accept (HevFshClientAccept *self)
@@ -61,8 +26,12 @@ hev_fsh_client_accept_send_accept (HevFshClientAccept *self)
     HevFshMessage msg;
     struct iovec iov[2];
     struct msghdr mh;
+    int res;
 
-    if (hev_fsh_client_base_connect (base) < 0)
+    LOG_D ("%p fsh client accept send accept", self);
+
+    res = hev_fsh_client_base_connect (base);
+    if (res < 0)
         return -1;
 
     msg.ver = 1;
@@ -78,9 +47,56 @@ hev_fsh_client_accept_send_accept (HevFshClientAccept *self)
     mh.msg_iov = iov;
     mh.msg_iovlen = 2;
 
-    if (hev_task_io_socket_sendmsg (base->fd, &mh, MSG_WAITALL,
-                                    fsh_task_io_yielder, self) <= 0)
+    res = hev_task_io_socket_sendmsg (base->fd, &mh, MSG_WAITALL, io_yielder,
+                                      self);
+    if (res <= 0)
         return -1;
 
     return 0;
+}
+
+int
+hev_fsh_client_accept_construct (HevFshClientAccept *self, HevFshConfig *config,
+                                 HevFshToken token)
+{
+    int res;
+
+    res = hev_fsh_client_base_construct (&self->base, config);
+    if (res < 0)
+        return res;
+
+    LOG_D ("%p fsh client accept construct", self);
+
+    HEV_OBJECT (self)->klass = HEV_FSH_CLIENT_ACCEPT_TYPE;
+
+    memcpy (self->token, token, sizeof (HevFshToken));
+
+    return 0;
+}
+
+static void
+hev_fsh_client_accept_destruct (HevObject *base)
+{
+    HevFshClientAccept *self = HEV_FSH_CLIENT_ACCEPT (base);
+
+    LOG_D ("%p fsh client accept destruct", self);
+
+    HEV_FSH_CLIENT_BASE_TYPE->finalizer (base);
+}
+
+HevObjectClass *
+hev_fsh_client_accept_class (void)
+{
+    static HevFshClientAcceptClass klass;
+    HevFshClientAcceptClass *kptr = &klass;
+    HevObjectClass *okptr = HEV_OBJECT_CLASS (kptr);
+
+    if (!okptr->name) {
+        memcpy (kptr, HEV_FSH_CLIENT_BASE_TYPE, sizeof (HevFshClientBaseClass));
+
+        okptr->name = "HevFshClientAccept";
+        okptr->finalizer = hev_fsh_client_accept_destruct;
+    }
+
+    return okptr;
 }
