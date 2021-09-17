@@ -86,7 +86,7 @@ __write_once_size (volatile void *dst, const void *src, int size)
         {                                              \
             typeof (x) __val;                          \
             char __c[1];                               \
-        } __u = { .__val = (typeof (x)) (val) };       \
+        } __u = { .__val = (typeof (x))(val) };        \
         __write_once_size (&(x), __u.__c, sizeof (x)); \
         __u.__val;                                     \
     })
