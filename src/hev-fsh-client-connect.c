@@ -57,6 +57,10 @@ hev_fsh_client_connect_send_connect (HevFshClientConnect *self)
     if (res <= 0)
         return -1;
 
+    res = hev_fsh_client_base_encrypt (base);
+    if (res < 0)
+        return -1;
+
     return 0;
 }
 
