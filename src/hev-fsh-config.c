@@ -27,6 +27,7 @@ typedef struct _HevFshAddrListNode HevFshAddrListNode;
 struct _HevFshConfig
 {
     int mode;
+    int crypto;
     int ip_type;
     int log_level;
 
@@ -45,6 +46,8 @@ struct _HevFshConfig
 
     const char *remote_address;
     unsigned int remote_port;
+
+    HevFshConfigKey key;
 };
 
 struct _HevTaskCallResolv
@@ -204,6 +207,26 @@ void
 hev_fsh_config_set_timeout (HevFshConfig *self, unsigned int val)
 {
     self->timeout = val;
+}
+
+HevFshConfigKey *
+hev_fsh_config_get_key (HevFshConfig *self)
+{
+    if (self->crypto)
+        return &self->key;
+
+    return NULL;
+}
+
+void
+hev_fsh_config_set_key (HevFshConfig *self, HevFshConfigKey *val)
+{
+    if (val) {
+        self->crypto = 1;
+        memcpy (&self->key, val, sizeof (self->key));
+    } else {
+        self->crypto = 0;
+    }
 }
 
 const char *

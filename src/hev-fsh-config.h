@@ -15,6 +15,7 @@
 #define HEV_FSH_CONFIG_TASK_STACK_SIZE (16384)
 
 typedef struct _HevFshConfig HevFshConfig;
+typedef struct _HevFshConfigKey HevFshConfigKey;
 typedef enum _HevFshConfigMode HevFshConfigMode;
 
 enum _HevFshConfigMode
@@ -27,6 +28,12 @@ enum _HevFshConfigMode
     HEV_FSH_CONFIG_MODE_CONNECTOR = (1 << 1),
     HEV_FSH_CONFIG_MODE_CONNECTOR_TERM = (1 << 1),
     HEV_FSH_CONFIG_MODE_CONNECTOR_PORT = (1 << 1) | 1,
+};
+
+struct _HevFshConfigKey
+{
+    unsigned char key[16];
+    unsigned char salt[4];
 };
 
 HevFshConfig *hev_fsh_config_new (void);
@@ -56,6 +63,9 @@ void hev_fsh_config_set_ip_type (HevFshConfig *self, int val);
 
 unsigned int hev_fsh_config_get_timeout (HevFshConfig *self);
 void hev_fsh_config_set_timeout (HevFshConfig *self, unsigned int val);
+
+HevFshConfigKey *hev_fsh_config_get_key (HevFshConfig *self);
+void hev_fsh_config_set_key (HevFshConfig *self, HevFshConfigKey *val);
 
 /* Forwarder terminal */
 const char *hev_fsh_config_get_user (HevFshConfig *self);
