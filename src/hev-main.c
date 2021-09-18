@@ -13,9 +13,6 @@
 #include <signal.h>
 #include <string.h>
 #include <unistd.h>
-#include <sys/stat.h>
-#include <sys/types.h>
-#include <sys/socket.h>
 #include <arpa/inet.h>
 
 #include <hev-task-system.h>
@@ -33,7 +30,7 @@ static void
 show_help (void)
 {
     fprintf (stderr,
-             "Common: [-4 | -6] [-t TIMEOUT] [-l LOG] [-v]\n"
+             "Common: [-4 | -6] [-k KEY] [-t TIMEOUT] [-l LOG] [-v]\n"
              "Server: -s [SERVER_ADDR:SERVER_PORT]\n"
              "Terminal:\n"
              "  Forwarder: -f [-u USER] SERVER_ADDR[:SERVER_PORT/TOKEN]\n"
@@ -358,6 +355,33 @@ parse_client (HevFshConfig *config, int f, int p, const char *t1,
 }
 
 static int
+parse_key (HevFshConfig *config, const char *key)
+{
+#ifdef __linux__
+    HevFshConfigKey k;
+    int res;
+    int fd;
+
+    fd = open (key, O_RDONLY);
+    if (fd < 0)
+        return -1;
+
+    res = read (fd, &k, sizeof (k));
+    if (res != sizeof (k)) {
+        close (fd);
+        return -1;
+    }
+
+    hev_fsh_config_set_key (config, &k);
+    close (fd);
+
+    return 0;
+#else
+    return -1;
+#endif
+}
+
+static int
 parse_args (HevFshConfig *config, int argc, char *argv[])
 {
     int opt;
@@ -365,6 +389,7 @@ parse_args (HevFshConfig *config, int argc, char *argv[])
     int s = 0;
     int f = 0;
     int p = 0;
+    const char *k = NULL;
     const char *l = NULL;
     const char *u = NULL;
     const char *w = NULL;
@@ -372,13 +397,16 @@ parse_args (HevFshConfig *config, int argc, char *argv[])
     const char *t1 = NULL;
     const char *t2 = NULL;
 
-    while ((opt = getopt (argc, argv, "46t:vsfpl:u:w:b:")) != -1) {
+    while ((opt = getopt (argc, argv, "46k:t:vsfpl:u:w:b:")) != -1) {
         switch (opt) {
         case '4':
             hev_fsh_config_set_ip_type (config, 4);
             break;
         case '6':
             hev_fsh_config_set_ip_type (config, 6);
+            break;
+        case 'k':
+            k = optarg;
             break;
         case 't':
             hev_fsh_config_set_timeout (config, strtoul (optarg, NULL, 10));
@@ -422,6 +450,11 @@ parse_args (HevFshConfig *config, int argc, char *argv[])
             return -1;
     } else {
         if (parse_client (config, f, p, t1, t2, w, b, u) < 0)
+            return -1;
+    }
+
+    if (k) {
+        if (parse_key (config, k) < 0)
             return -1;
     }
 
