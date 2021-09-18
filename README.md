@@ -8,6 +8,7 @@ Fsh is to help you access local Shell and TCP services behind NAT or firewall.
 * Shell.
 * TCP Port.
 * IPv4/IPv6. (dual stack)
+* End-to-end encryption. (Linux only, it depends on kernel TLS)
 
 ```
     +-------------+      +-------------+
@@ -50,16 +51,13 @@ make
 
 **Server**:
 ```bash
-fsh -s [-l LOG] [SERVER_ADDR:SERVER_PORT]
+fsh -s [SERVER_ADDR:SERVER_PORT]
 
 # Listen on 0.0.0.0:6339 and log to stdout
 fsh -s
 
 # Listen on specific address:port
 fsh -s 10.0.0.1:8000
-
-# Log to file
-fsh -s -l /var/log/fsh.log
 ```
 
 **Forwarder**:
@@ -117,7 +115,7 @@ fsh -s -l /var/log/fsh.log
 
 **Common**:
 ```bash
-fsh [-4 | -6] [-t TIMEOUT]
+fsh [-4 | -6] [-k KEY] [-t TIMEOUT] [-l LOG] [-v]
 
 # Resolve names to IPv4 addresses only
 fsh -4
@@ -125,8 +123,18 @@ fsh -4
 # Resolve names to IPv6 addresses only
 fsh -6
 
+# End-to-end encryption
+# key: random 20-byte
+fsh -k /path/to/key
+
 # Session timeout (seconds)
 fsh -t 1000
+
+# Log to file
+fsh -l /var/log/fsh.log
+
+# Log verbose
+fsh -v
 ```
 
 **IPv6**:
