@@ -142,6 +142,24 @@ fsh -p 2200:[::1]:22 127.0.0.1/8b9bf4e7-b2b2-4115-ac97-0c7f69433bc4
 fsh -p [::1]:2200:[::1]:22 127.0.0.1/8b9bf4e7-b2b2-4115-ac97-0c7f69433bc4
 ```
 
+## Classes
+
+```
+HevObject +-> HevFshBase +-> HevFshServer
+          |              +-> HevFshClient
+          +-> HevFshSessionManager
+          +-> HevFshClientFactory
+          +-> HevFshIO +-> HevFshSession
+                       +-> HevFshClientBase +-> HevFshClientAccept +-> HevFshClientPortAccept
+                                            |                      +-> HevFshClientTermAccept
+                                            |
+                                            +-> HevFshClientConnect +-> HevFshClientPortConnect
+                                            |                       +-> HevFshClientTermConnect
+                                            |
+                                            +-> HevFshClientForward
+                                            +-> HevFshClientPortListen
+```
+
 ## Contributors
 * **hev** - https://hev.cc
 
