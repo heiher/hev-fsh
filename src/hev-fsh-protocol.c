@@ -8,15 +8,12 @@
  */
 
 #include <ctype.h>
-#include <fcntl.h>
 #include <stdio.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
-#include <unistd.h>
-#include <sys/types.h>
-#include <sys/time.h>
-#include <sys/stat.h>
+
+#include "hev-random.h"
 
 #include "hev-fsh-protocol.h"
 
@@ -68,55 +65,6 @@ unpack (HevFshToken token, uint32_t *time_low, uint16_t *time_mid,
     *clock_seq = (*clock_seq << 8) | *ptr++;
 }
 
-static void
-get_random_bytes (void *buf, size_t size)
-{
-    int fd;
-    size_t i;
-    unsigned char *cp = buf;
-    static int init = 0;
-
-    fd = open ("/dev/urandom", O_RDONLY | O_CLOEXEC);
-    if (fd < 0)
-        fd = open ("/dev/random", O_RDONLY | O_NONBLOCK | O_CLOEXEC);
-
-    if (fd >= 0) {
-        size_t n = size;
-        int lose_counter = 0;
-
-        while (n > 0) {
-            ssize_t x = read (fd, cp, n);
-            if (x <= 0) {
-                if (lose_counter++ > 16)
-                    break;
-                continue;
-            }
-            n -= x;
-            cp += x;
-            lose_counter = 0;
-        }
-
-        close (fd);
-        return;
-    }
-
-    if (!init) {
-        struct timeval tv;
-
-        gettimeofday (&tv, 0);
-        srand (tv.tv_sec ^ tv.tv_usec);
-
-        gettimeofday (&tv, 0);
-        for (i = (tv.tv_sec ^ tv.tv_usec) & 0x1F; i > 0; i--)
-            rand ();
-
-        init = 1;
-    }
-
-    for (i = 0; i < size; i++)
-        *cp++ = (rand () >> 7) & 0xFF;
-}
-
 void
 hev_fsh_protocol_token_generate (HevFshToken token)
 {
@@ -125,7 +73,7 @@ hev_fsh_protocol_token_generate (HevFshToken token)
     uint16_t time_high_ver;
     uint16_t clock_seq;
 
-    get_random_bytes (token, sizeof (HevFshToken));
+    hev_random_get_bytes (token, sizeof (HevFshToken));
 
     unpack (token, &time_low, &time_mid, &time_high_ver, &clock_seq);
     clock_seq = (clock_seq & 0x3FFF) | 0x8000;
