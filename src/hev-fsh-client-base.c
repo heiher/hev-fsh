@@ -14,12 +14,18 @@
 #include <string.h>
 #include <signal.h>
 
+#ifdef __linux__
+#include <linux/tls.h>
+#include <netinet/tcp.h>
+#endif
+
 #include <hev-task.h>
 #include <hev-task-io.h>
 #include <hev-task-io-socket.h>
 #include <hev-memory-allocator.h>
 
 #include "hev-logger.h"
+#include "hev-random.h"
 
 #include "hev-fsh-client-base.h"
 
@@ -126,6 +132,55 @@ hev_fsh_client_base_connect (HevFshClientBase *self)
 
     self->fd = fd;
 
+    return 0;
+}
+
+int
+hev_fsh_client_base_encrypt (HevFshClientBase *self)
+{
+#ifdef __linux__
+    struct tls12_crypto_info_aes_gcm_128 ci;
+    HevFshConfigKey *key;
+    int res;
+
+    LOG_D ("%p fsh client base encrypt", self);
+
+    key = hev_fsh_config_get_key (self->config);
+    if (!key)
+        return 0;
+
+    ci.info.version = TLS_1_2_VERSION;
+    ci.info.cipher_type = TLS_CIPHER_AES_GCM_128;
+    hev_random_get_bytes (ci.iv, TLS_CIPHER_AES_GCM_128_IV_SIZE);
+    memcpy (ci.key, key->key, TLS_CIPHER_AES_GCM_128_KEY_SIZE);
+    memcpy (ci.salt, key->salt, TLS_CIPHER_AES_GCM_128_SALT_SIZE);
+    memset (ci.rec_seq, 0, TLS_CIPHER_AES_GCM_128_REC_SEQ_SIZE);
+
+    res = hev_task_io_socket_send (self->fd, ci.iv, sizeof (ci.iv), MSG_WAITALL,
+                                   io_yielder, self);
+    if (res <= 0)
+        return -1;
+
+    res = setsockopt (self->fd, SOL_TCP, TCP_ULP, "tls", sizeof ("tls"));
+    if (res < 0) {
+        LOG_E ("%p fsh client base tls (modprobe tls)", self);
+        return -1;
+    }
+
+    res = setsockopt (self->fd, SOL_TLS, TLS_TX, &ci, sizeof (ci));
+    if (res < 0)
+        return -1;
+
+    res = hev_task_io_socket_recv (self->fd, ci.iv, sizeof (ci.iv), MSG_WAITALL,
+                                   io_yielder, self);
+    if (res <= 0)
+        return -1;
+
+    res = setsockopt (self->fd, SOL_TLS, TLS_RX, &ci, sizeof (ci));
+    if (res < 0)
+        return -1;
+
+#endif
     return 0;
 }
 

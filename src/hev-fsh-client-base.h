@@ -44,6 +44,7 @@ int hev_fsh_client_base_construct (HevFshClientBase *self,
 
 int hev_fsh_client_base_listen (HevFshClientBase *self);
 int hev_fsh_client_base_connect (HevFshClientBase *self);
+int hev_fsh_client_base_encrypt (HevFshClientBase *self);
 
 #ifdef __cplusplus
 }
