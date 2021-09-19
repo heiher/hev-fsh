@@ -15,6 +15,7 @@
 #include "hev-fsh-client-forward.h"
 #include "hev-fsh-client-port-listen.h"
 #include "hev-fsh-client-port-connect.h"
+#include "hev-fsh-client-sock-listen.h"
 #include "hev-fsh-client-term-connect.h"
 
 #include "hev-fsh-client-factory.h"
@@ -35,6 +36,8 @@ hev_fsh_client_factory_get (HevFshClientFactory *self)
             return hev_fsh_client_port_listen_new (self->config);
         else
             return hev_fsh_client_port_connect_new (self->config, -1);
+    } else if (HEV_FSH_CONFIG_MODE_CONNECTOR_SOCK == mode) {
+        return hev_fsh_client_sock_listen_new (self->config);
     } else if (HEV_FSH_CONFIG_MODE_CONNECTOR_TERM == mode) {
         return hev_fsh_client_term_connect_new (self->config);
     }
