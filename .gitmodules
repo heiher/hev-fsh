@@ -1,3 +1,6 @@
 [submodule "third-part/hev-task-system"]
 	path = third-part/hev-task-system
 	url = https://gitlab.com/hev/hev-task-system
+[submodule "src/sock"]
+	path = src/sock
+	url = https://github.com/heiher/hev-socks5-core
