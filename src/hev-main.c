@@ -41,6 +41,10 @@ show_help (void)
              "  Connector: -p [LOCAL_ADDR:]LOCAL_PORT:REMOTE_ADDR:REMOTE_PORT "
              "SERVER_ADDR[:SERVER_PORT]/TOKEN\n"
              "             -p REMOTE_ADDR:REMOTE_PORT "
+             "SERVER_ADDR[:SERVER_PORT]/TOKEN\n"
+             "Socks v5:\n"
+             "  Forwarder: -f -x SERVER_ADDR[:SERVER_PORT/TOKEN]\n"
+             "  Connector: -x [LOCAL_ADDR:]LOCAL_PORT "
              "SERVER_ADDR[:SERVER_PORT]/TOKEN\n");
     fprintf (stderr, "Version: %d.%d.%d\n", MAJOR_VERSION, MINOR_VERSION,
              MICRO_VERSION);
@@ -270,6 +274,29 @@ parse_set_addr_pair (HevFshConfig *config, const char *str)
 }
 
 static int
+parse_set_addr (HevFshConfig *config, const char *str)
+{
+    if (!strchr (str, ':')) {
+        hev_fsh_config_set_local_port (config, atoi (str));
+    } else {
+        const char *addr = NULL;
+        const char *port = NULL;
+        char *b;
+
+        b = parse_addr (str, &addr, &port, NULL);
+        if (!b || !addr || !port) {
+            free (b);
+            return -1;
+        }
+
+        hev_fsh_config_set_local_address (config, addr);
+        hev_fsh_config_set_local_port (config, atoi (port));
+    }
+
+    return 0;
+}
+
+static int
 parse_server (HevFshConfig *config, const char *sa)
 {
     if (sa) {
@@ -290,7 +317,7 @@ parse_server (HevFshConfig *config, const char *sa)
 }
 
 static int
-parse_client (HevFshConfig *config, int f, int p, const char *t1,
+parse_client (HevFshConfig *config, int f, int p, int x, const char *t1,
               const char *t2, const char *w, const char *b, const char *u)
 {
     const char *addr = NULL;
@@ -300,7 +327,7 @@ parse_client (HevFshConfig *config, int f, int p, const char *t1,
     const char *sa;
     int mode;
 
-    if (!f && p) {
+    if (!f && (p || x)) {
         ap = t1;
         sa = t2;
     } else {
@@ -332,6 +359,8 @@ parse_client (HevFshConfig *config, int f, int p, const char *t1,
                 hev_fsh_config_addr_list_add (config, 0, NULL, 0, 1);
             }
             mode = HEV_FSH_CONFIG_MODE_FORWARDER_PORT;
+        } else if (x) {
+            mode = HEV_FSH_CONFIG_MODE_FORWARDER_SOCK;
         } else {
             hev_fsh_config_set_user (config, u);
             mode = HEV_FSH_CONFIG_MODE_FORWARDER_TERM;
@@ -344,6 +373,10 @@ parse_client (HevFshConfig *config, int f, int p, const char *t1,
             if (parse_set_addr_pair (config, ap) < 0)
                 return -1;
             mode = HEV_FSH_CONFIG_MODE_CONNECTOR_PORT;
+        } else if (x) {
+            if (parse_set_addr (config, ap) < 0)
+                return -1;
+            mode = HEV_FSH_CONFIG_MODE_CONNECTOR_SOCK;
         } else {
             mode = HEV_FSH_CONFIG_MODE_CONNECTOR_TERM;
         }
@@ -389,6 +422,7 @@ parse_args (HevFshConfig *config, int argc, char *argv[])
     int s = 0;
     int f = 0;
     int p = 0;
+    int x = 0;
     const char *k = NULL;
     const char *l = NULL;
     const char *u = NULL;
@@ -397,7 +431,7 @@ parse_args (HevFshConfig *config, int argc, char *argv[])
     const char *t1 = NULL;
     const char *t2 = NULL;
 
-    while ((opt = getopt (argc, argv, "46k:t:vsfpl:u:w:b:")) != -1) {
+    while ((opt = getopt (argc, argv, "46k:t:vsfpxl:u:w:b:")) != -1) {
         switch (opt) {
         case '4':
             hev_fsh_config_set_ip_type (config, 4);
@@ -422,6 +456,9 @@ parse_args (HevFshConfig *config, int argc, char *argv[])
             break;
         case 'p':
             p = 1;
+            break;
+        case 'x':
+            x = 1;
             break;
         case 'l':
             l = optarg;
@@ -449,7 +486,7 @@ parse_args (HevFshConfig *config, int argc, char *argv[])
         if (parse_server (config, t1) < 0)
             return -1;
     } else {
-        if (parse_client (config, f, p, t1, t2, w, b, u) < 0)
+        if (parse_client (config, f, p, x, t1, t2, w, b, u) < 0)
             return -1;
     }
 
