@@ -21,42 +21,16 @@
 #include "hev-fsh-client-port-listen.h"
 
 static void
-hev_fsh_client_port_listen_task_entry (void *data)
+hev_fsh_client_port_listen_dispatch (HevFshClientListen *base, int fd)
 {
-    HevFshClientBase *base = data;
-    int res;
+    HevFshClientBase *b = HEV_FSH_CLIENT_BASE (base);
+    HevFshClientBase *client;
 
-    res = hev_fsh_client_base_listen (base);
-    if (res < 0) {
-        LOG_E ("%p fsh client port listen listen", base);
-        goto exit;
-    }
-
-    for (;;) {
-        HevFshClientBase *client;
-        int fd;
-
-        fd = hev_task_io_socket_accept (base->fd, NULL, NULL, NULL, NULL);
-        if (fd < 0)
-            continue;
-
-        client = hev_fsh_client_port_connect_new (base->config, fd);
-        if (client)
-            hev_fsh_io_run (HEV_FSH_IO (client));
-        else
-            close (fd);
-    }
-
-exit:
-    hev_object_unref (HEV_OBJECT (base));
-}
-
-static void
-hev_fsh_client_port_listen_run (HevFshIO *base)
-{
-    LOG_D ("%p fsh client port listen run", base);
-
-    hev_task_run (base->task, hev_fsh_client_port_listen_task_entry, base);
+    client = hev_fsh_client_port_connect_new (b->config, fd);
+    if (client)
+        hev_fsh_io_run (HEV_FSH_IO (client));
+    else
+        close (fd);
 }
 
 HevFshClientBase *
@@ -86,7 +60,7 @@ hev_fsh_client_port_listen_construct (HevFshClientPortListen *self,
 {
     int res;
 
-    res = hev_fsh_client_base_construct (&self->base, config);
+    res = hev_fsh_client_listen_construct (&self->base, config);
     if (res < 0)
         return res;
 
@@ -104,7 +78,7 @@ hev_fsh_client_port_listen_destruct (HevObject *base)
 
     LOG_D ("%p fsh client port listen destruct", self);
 
-    HEV_FSH_CLIENT_BASE_TYPE->finalizer (base);
+    HEV_FSH_CLIENT_LISTEN_TYPE->finalizer (base);
 }
 
 HevObjectClass *
@@ -115,15 +89,17 @@ hev_fsh_client_port_listen_class (void)
     HevObjectClass *okptr = HEV_OBJECT_CLASS (kptr);
 
     if (!okptr->name) {
-        HevFshIOClass *ikptr;
+        HevFshClientListenClass *ckptr;
+        void *ptr;
 
-        memcpy (kptr, HEV_FSH_CLIENT_BASE_TYPE, sizeof (HevFshClientBaseClass));
+        ptr = HEV_FSH_CLIENT_LISTEN_TYPE;
+        memcpy (kptr, ptr, sizeof (HevFshClientListenClass));
 
         okptr->name = "HevFshClientPortListen";
         okptr->finalizer = hev_fsh_client_port_listen_destruct;
 
-        ikptr = HEV_FSH_IO_CLASS (kptr);
-        ikptr->run = hev_fsh_client_port_listen_run;
+        ckptr = HEV_FSH_CLIENT_LISTEN_CLASS (kptr);
+        ckptr->dispatch = hev_fsh_client_port_listen_dispatch;
     }
 
     return okptr;
