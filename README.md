@@ -7,6 +7,7 @@ Fsh is to help you access local Shell and TCP services behind NAT or firewall.
 **Features**
 * Shell.
 * TCP Port.
+* Socks v5.
 * IPv4/IPv6. (dual stack)
 * End-to-end encryption. (Linux only, it depends on kernel TLS)
 
@@ -91,6 +92,10 @@ fsh -s 10.0.0.1:8000
     # Reject the TCP ports in black list (others allowed)
     fsh -f -p -b 192.168.0.1:22,192.168.1.3:80 10.0.0.1
     ```
+* **Socks v5**
+    ```bash
+    fsh -f -x SERVER_ADDR[:SERVER_PORT/TOKEN
+    ```
 
 **Connector**:
 * **Terminal**
@@ -111,6 +116,10 @@ fsh -s 10.0.0.1:8000
 
     # Splice to stdio (Support SSH ProxyCommand)
     fsh -p 192.168.0.1:22 10.0.0.1/8b9bf4e7-b2b2-4115-ac97-0c7f69433bc4
+    ```
+* **Socks v5**
+    ```bash
+    fsh -x [LOCAL_ADDR:]LOCAL_PORT SERVER_ADDR[:SERVER_PORT]/TOKEN
     ```
 
 **Common**:
@@ -159,13 +168,17 @@ HevObject +-> HevFshBase +-> HevFshServer
           +-> HevFshClientFactory
           +-> HevFshIO +-> HevFshSession
                        +-> HevFshClientBase +-> HevFshClientAccept +-> HevFshClientPortAccept
+                                            |                      +-> HevFshClientSockAccept
                                             |                      +-> HevFshClientTermAccept
                                             |
                                             +-> HevFshClientConnect +-> HevFshClientPortConnect
+                                            |                       +-> HevFshClientSockConnect
                                             |                       +-> HevFshClientTermConnect
                                             |
+                                            +-> HevFshClientListen +-> HevFshClientPortListen
+                                            |                      +-> HevFshClientSockListen
+                                            |
                                             +-> HevFshClientForward
-                                            +-> HevFshClientPortListen
 ```
 
 ## Contributors
