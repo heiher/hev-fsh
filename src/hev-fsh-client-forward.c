@@ -17,6 +17,7 @@
 #include "hev-logger.h"
 #include "hev-fsh-client-term-accept.h"
 #include "hev-fsh-client-port-accept.h"
+#include "hev-fsh-client-sock-accept.h"
 
 #include "hev-fsh-client-forward.h"
 
@@ -174,10 +175,17 @@ hev_fsh_client_forward_task_entry (void *data)
             goto restart;
 
         mode = hev_fsh_config_get_mode (base->config);
-        if (HEV_FSH_CONFIG_MODE_FORWARDER_PORT == mode)
+        switch (mode) {
+        case HEV_FSH_CONFIG_MODE_FORWARDER_PORT:
             accept = hev_fsh_client_port_accept_new (base->config, self->token);
-        else
+            break;
+        case HEV_FSH_CONFIG_MODE_FORWARDER_SOCK:
+            accept = hev_fsh_client_sock_accept_new (base->config, self->token);
+            break;
+        default:
             accept = hev_fsh_client_term_accept_new (base->config, self->token);
+            break;
+        }
 
         if (accept)
             hev_fsh_io_run (HEV_FSH_IO (accept));
