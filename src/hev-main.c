@@ -38,9 +38,9 @@ show_help (void)
              "TCP Port:\n"
              "  Forwarder: -f -p [-w ADDR:PORT,... | -b ADDR:PORT,...] "
              "SERVER_ADDR[:SERVER_PORT/TOKEN]\n"
-             "  Connector: -p [LOCAL_ADDR:]LOCAL_PORT:REMOTE_ADD:REMOTE_PORT "
+             "  Connector: -p [LOCAL_ADDR:]LOCAL_PORT:REMOTE_ADDR:REMOTE_PORT "
              "SERVER_ADDR[:SERVER_PORT]/TOKEN\n"
-             "             -p REMOTE_ADD:REMOTE_PORT "
+             "             -p REMOTE_ADDR:REMOTE_PORT "
              "SERVER_ADDR[:SERVER_PORT]/TOKEN\n");
     fprintf (stderr, "Version: %d.%d.%d\n", MAJOR_VERSION, MINOR_VERSION,
              MICRO_VERSION);
