@@ -21,13 +21,15 @@ typedef enum _HevFshConfigMode HevFshConfigMode;
 enum _HevFshConfigMode
 {
     HEV_FSH_CONFIG_MODE_NONE = 0,
-    HEV_FSH_CONFIG_MODE_SERVER = (1 << 3),
-    HEV_FSH_CONFIG_MODE_FORWARDER = (1 << 2),
-    HEV_FSH_CONFIG_MODE_FORWARDER_TERM = (1 << 2),
-    HEV_FSH_CONFIG_MODE_FORWARDER_PORT = (1 << 2) | 1,
-    HEV_FSH_CONFIG_MODE_CONNECTOR = (1 << 1),
-    HEV_FSH_CONFIG_MODE_CONNECTOR_TERM = (1 << 1),
-    HEV_FSH_CONFIG_MODE_CONNECTOR_PORT = (1 << 1) | 1,
+    HEV_FSH_CONFIG_MODE_SERVER = (1 << 4),
+    HEV_FSH_CONFIG_MODE_FORWARDER = (1 << 3),
+    HEV_FSH_CONFIG_MODE_FORWARDER_TERM = (1 << 3),
+    HEV_FSH_CONFIG_MODE_FORWARDER_PORT = (1 << 3) | (1 << 0),
+    HEV_FSH_CONFIG_MODE_FORWARDER_SOCK = (1 << 3) | (1 << 1),
+    HEV_FSH_CONFIG_MODE_CONNECTOR = (1 << 2),
+    HEV_FSH_CONFIG_MODE_CONNECTOR_TERM = (1 << 2),
+    HEV_FSH_CONFIG_MODE_CONNECTOR_PORT = (1 << 2) | (1 << 0),
+    HEV_FSH_CONFIG_MODE_CONNECTOR_SOCK = (1 << 2) | (1 << 1),
 };
 
 struct _HevFshConfigKey
@@ -77,7 +79,7 @@ int hev_fsh_config_addr_list_contains (HevFshConfig *self, int type, void *addr,
 void hev_fsh_config_addr_list_add (HevFshConfig *self, int type, void *addr,
                                    unsigned int port, int action);
 
-/* Connector port */
+/* Connector port | sock */
 const char *hev_fsh_config_get_local_address (HevFshConfig *self);
 void hev_fsh_config_set_local_address (HevFshConfig *self, const char *val);
 
