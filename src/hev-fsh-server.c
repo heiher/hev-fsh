@@ -10,7 +10,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
-#include <arpa/inet.h>
 
 #include <hev-task.h>
 #include <hev-task-io.h>
@@ -37,9 +36,7 @@ hev_fsh_server_task_entry (void *data)
         int fd;
 
         fd = hev_task_io_socket_accept (self->fd, NULL, NULL, NULL, NULL);
-        if (fd == -2) {
-            break;
-        } else if (fd < 0) {
+        if (fd < 0) {
             LOG_W ("%p fsh server accept", self);
             continue;
         }
