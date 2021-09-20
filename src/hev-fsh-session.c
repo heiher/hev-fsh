@@ -25,7 +25,8 @@
 
 enum
 {
-    TYPE_FORWARD = 1,
+    TYPE_NULL = 0,
+    TYPE_FORWARD,
     TYPE_CONNECT,
     TYPE_SPLICE,
     TYPE_CLOSED,
@@ -50,6 +51,19 @@ sleep_wait (unsigned int milliseconds)
 {
     while (milliseconds)
         milliseconds = hev_task_sleep (milliseconds);
+}
+
+static void
+hev_fsh_session_kill (HevFshSession *self)
+{
+    HevFshIO *io = HEV_FSH_IO (self);
+
+    self->is_mgr = 0;
+    self->type = TYPE_CLOSED;
+    hev_fsh_session_manager_remove (self->manager, self);
+
+    io->timeout = 0;
+    hev_task_wakeup (io->task);
 }
 
 static void
@@ -136,13 +150,8 @@ hev_fsh_session_do_login (HevFshSession *self)
 
             s = hev_fsh_session_manager_find (self->manager, TYPE_FORWARD,
                                               &msg_token.token);
-            if (s) {
-                s->type = TYPE_CLOSED;
-                HEV_FSH_IO (s)->timeout = 0;
-                hev_fsh_session_manager_remove (self->manager, s);
-                hev_fsh_session_manager_insert (self->manager, s);
-                hev_task_wakeup (HEV_FSH_IO (s)->task);
-            }
+            if (s)
+                hev_fsh_session_kill (s);
 
             memcpy (self->token, msg_token.token, sizeof (HevFshToken));
         }
@@ -151,6 +160,7 @@ hev_fsh_session_do_login (HevFshSession *self)
     if (self->type)
         return STEP_CLOSE_SESSION;
 
+    self->is_mgr = 1;
     self->type = TYPE_FORWARD;
     hev_fsh_session_manager_insert (self->manager, self);
     hev_fsh_session_log (self, "L");
@@ -203,6 +213,7 @@ hev_fsh_session_do_connect (HevFshSession *self)
     if (self->type)
         return STEP_CLOSE_SESSION;
 
+    self->is_mgr = 1;
     self->type = TYPE_CONNECT;
     memcpy (self->token, msg_token.token, sizeof (HevFshToken));
     hev_fsh_session_manager_insert (self->manager, self);
@@ -325,10 +336,11 @@ hev_fsh_session_do_splice (HevFshSession *self)
 static int
 hev_fsh_session_close_session (HevFshSession *self)
 {
-    if (self->type) {
-        hev_fsh_session_manager_remove (self->manager, self);
+    if (self->type)
         hev_fsh_session_log (self, "D");
-    }
+
+    if (self->is_mgr)
+        hev_fsh_session_manager_remove (self->manager, self);
 
     hev_object_unref (HEV_OBJECT (self));
 

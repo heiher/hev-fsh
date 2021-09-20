@@ -33,10 +33,12 @@ struct _HevFshSession
 {
     HevFshIO base;
 
-    int type;
-    int msg_ver;
     int client_fd;
     int remote_fd;
+
+    unsigned char type;
+    unsigned char is_mgr;
+    unsigned char msg_ver;
 
     HevFshToken token;
     HevTaskMutex wlock;
