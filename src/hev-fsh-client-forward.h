@@ -10,6 +10,9 @@
 #ifndef __HEV_FSH_CLIENT_FORWARD_H__
 #define __HEV_FSH_CLIENT_FORWARD_H__
 
+#include <hev-task.h>
+#include <hev-task-mutex.h>
+
 #include "hev-fsh-config.h"
 #include "hev-fsh-protocol.h"
 #include "hev-fsh-client-base.h"
@@ -29,7 +32,9 @@ struct _HevFshClientForward
 {
     HevFshClientBase base;
 
+    HevTask *task;
     HevFshToken token;
+    HevTaskMutex wlock;
 };
 
 struct _HevFshClientForwardClass

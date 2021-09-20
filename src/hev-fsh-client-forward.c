@@ -8,6 +8,7 @@
  */
 
 #include <string.h>
+#include <unistd.h>
 
 #include <hev-task.h>
 #include <hev-task-io.h>
@@ -32,8 +33,10 @@ hev_fsh_client_forward_write_login (HevFshClientForward *self)
 
     msg.ver = token ? 2 : 1;
     msg.cmd = HEV_FSH_CMD_LOGIN;
+    hev_task_mutex_lock (&self->wlock);
     res = hev_task_io_socket_send (self->base.fd, &msg, sizeof (msg),
                                    MSG_WAITALL, io_yielder, self);
+    hev_task_mutex_unlock (&self->wlock);
     if (res <= 0)
         return -1;
 
@@ -48,8 +51,10 @@ hev_fsh_client_forward_write_login (HevFshClientForward *self)
 
         memcpy (mtoken.token, self->token, sizeof (HevFshToken));
 
+        hev_task_mutex_lock (&self->wlock);
         res = hev_task_io_socket_send (self->base.fd, &mtoken, sizeof (mtoken),
                                        MSG_WAITALL, io_yielder, self);
+        hev_task_mutex_unlock (&self->wlock);
         if (res <= 0)
             return -1;
     }
@@ -103,14 +108,84 @@ static int
 hev_fsh_client_forward_write_keep_alive (HevFshClientForward *self)
 {
     HevFshMessage msg;
+    int res;
 
     LOG_D ("%p fsh client forward keep alive", self);
 
     msg.ver = 2;
     msg.cmd = HEV_FSH_CMD_KEEP_ALIVE;
 
-    return hev_task_io_socket_send (self->base.fd, &msg, sizeof (msg),
-                                    MSG_WAITALL, io_yielder, self);
+    hev_task_mutex_lock (&self->wlock);
+    res = hev_task_io_socket_send (self->base.fd, &msg, sizeof (msg),
+                                   MSG_WAITALL, io_yielder, self);
+    hev_task_mutex_unlock (&self->wlock);
+
+    return res;
+}
+
+static void
+hev_fsh_client_forward_accept (HevFshClientForward *self)
+{
+    HevFshClientBase *base = HEV_FSH_CLIENT_BASE (self);
+    HevFshClientBase *accept;
+    int mode;
+
+    LOG_D ("%p fsh client forward accept", self);
+
+    mode = hev_fsh_config_get_mode (base->config);
+    switch (mode) {
+    case HEV_FSH_CONFIG_MODE_FORWARDER_PORT:
+        accept = hev_fsh_client_port_accept_new (base->config, self->token);
+        break;
+    case HEV_FSH_CONFIG_MODE_FORWARDER_SOCK:
+        accept = hev_fsh_client_sock_accept_new (base->config, self->token);
+        break;
+    default:
+        accept = hev_fsh_client_term_accept_new (base->config, self->token);
+        break;
+    }
+
+    if (accept)
+        hev_fsh_io_run (HEV_FSH_IO (accept));
+}
+
+static void
+hev_fsh_client_forward_dispatch (HevFshClientForward *self)
+{
+    HevFshClientBase *base = HEV_FSH_CLIENT_BASE (self);
+
+    LOG_D ("%p fsh client forward dispatch", self);
+
+    for (;;) {
+        HevFshMessageToken token;
+        HevFshMessage msg;
+        int res;
+
+        res = hev_task_io_socket_recv (base->fd, &msg, sizeof (msg),
+                                       MSG_WAITALL, io_yielder, self);
+        if (res <= 0)
+            return;
+
+        switch (msg.cmd) {
+        case HEV_FSH_CMD_CONNECT:
+            break;
+        case HEV_FSH_CMD_KEEP_ALIVE:
+            continue;
+        default:
+            return;
+        }
+
+        res = hev_task_io_socket_recv (base->fd, &token, sizeof (token),
+                                       MSG_WAITALL, io_yielder, self);
+        if (res <= 0)
+            return;
+
+        res = memcmp (token.token, self->token, sizeof (HevFshToken));
+        if (res != 0)
+            return;
+
+        hev_fsh_client_forward_accept (self);
+    }
 }
 
 static void
@@ -118,97 +193,54 @@ hev_fsh_client_forward_task_entry (void *data)
 {
     HevFshClientForward *self = data;
     HevFshClientBase *base = data;
-    int keep_alive = 0;
-    int res;
-
-    res = hev_fsh_client_base_connect (base);
-    if (res < 0) {
-        LOG_E ("%p fsh client forward connect", self);
-        goto restart;
-    }
-
-    res = hev_fsh_client_forward_write_login (self);
-    if (res < 0)
-        goto restart;
-
-    res = hev_fsh_client_forward_read_token (self);
-    if (res < 0)
-        goto restart;
 
     for (;;) {
-        HevFshClientBase *accept;
-        HevFshMessageToken token;
-        HevFshMessage msg;
-        int mode;
         int res;
 
-        res = hev_task_io_socket_recv (base->fd, &msg, sizeof (msg),
-                                       MSG_WAITALL, io_yielder, self);
-        if (res == -2) {
-            if (keep_alive++)
-                goto restart;
-            res = hev_fsh_client_forward_write_keep_alive (self);
-            if (res < 0)
-                goto restart;
-            continue;
-        } else if (res <= 0) {
+        res = hev_fsh_client_base_connect (base);
+        if (res < 0) {
+            LOG_E ("%p fsh client forward connect", self);
             goto restart;
         }
 
-        switch (msg.cmd) {
-        case HEV_FSH_CMD_CONNECT:
-            break;
-        case HEV_FSH_CMD_KEEP_ALIVE:
-            keep_alive = 0;
-            continue;
-        default:
-            goto restart;
-        }
-
-        res = hev_task_io_socket_recv (base->fd, &token, sizeof (token),
-                                       MSG_WAITALL, io_yielder, self);
-        if (res <= 0)
-            goto restart;
-
-        res = memcmp (token.token, self->token, sizeof (HevFshToken));
-        if (res != 0)
-            goto restart;
-
-        mode = hev_fsh_config_get_mode (base->config);
-        switch (mode) {
-        case HEV_FSH_CONFIG_MODE_FORWARDER_PORT:
-            accept = hev_fsh_client_port_accept_new (base->config, self->token);
-            break;
-        case HEV_FSH_CONFIG_MODE_FORWARDER_SOCK:
-            accept = hev_fsh_client_sock_accept_new (base->config, self->token);
-            break;
-        default:
-            accept = hev_fsh_client_term_accept_new (base->config, self->token);
-            break;
-        }
-
-        if (accept)
-            hev_fsh_io_run (HEV_FSH_IO (accept));
-
-        res = hev_fsh_client_forward_write_keep_alive (self);
+        res = hev_fsh_client_forward_write_login (self);
         if (res < 0)
             goto restart;
+
+        res = hev_fsh_client_forward_read_token (self);
+        if (res < 0)
+            goto restart;
+
+        hev_fsh_client_forward_dispatch (self);
+
+    restart:
+        close (base->fd);
+        hev_task_sleep (1000);
     }
+}
 
-restart:
-    hev_object_unref (HEV_OBJECT (self));
+static void
+hev_fsh_client_forward_kalive_task_entry (void *data)
+{
+    HevFshClientForward *self = data;
 
-    hev_task_sleep (1000);
-    base = hev_fsh_client_forward_new (base->config);
-    hev_fsh_io_run (HEV_FSH_IO (base));
+    for (;;) {
+        HevFshIO *io = data;
+
+        hev_task_sleep (io->timeout / 2);
+        hev_fsh_client_forward_write_keep_alive (self);
+    }
 }
 
 static void
 hev_fsh_client_forward_run (HevFshIO *base)
 {
-    LOG_D ("%p fsh client forward run", base);
+    HevFshClientForward *self = HEV_FSH_CLIENT_FORWARD (base);
 
-    hev_task_run (base->task, hev_fsh_client_forward_task_entry, base);
+    LOG_D ("%p fsh client forward run", self);
+
+    hev_task_run (base->task, hev_fsh_client_forward_task_entry, self);
+    hev_task_run (self->task, hev_fsh_client_forward_kalive_task_entry, self);
 }
 
 HevFshClientBase *
@@ -245,6 +277,10 @@ hev_fsh_client_forward_construct (HevFshClientForward *self,
     LOG_D ("%p fsh client forward construct", self);
 
     HEV_OBJECT (self)->klass = HEV_FSH_CLIENT_FORWARD_TYPE;
+
+    self->task = hev_task_new (HEV_FSH_CONFIG_TASK_STACK_SIZE);
+    if (!self->task)
+        return -1;
 
     return 0;
 }
