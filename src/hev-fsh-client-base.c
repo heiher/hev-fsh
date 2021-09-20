@@ -29,6 +29,14 @@
 
 #include "hev-fsh-client-base.h"
 
+#ifndef TLS_TX
+#define TLS_TX 1
+#endif
+
+#ifndef TLS_RX
+#define TLS_RX 2
+#endif
+
 static int
 hev_fsh_client_base_socket (HevFshClientBase *self, int family)
 {
