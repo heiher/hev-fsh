@@ -16,6 +16,7 @@
 #include <hev-memory-allocator.h>
 
 #include "hev-logger.h"
+#include "hev-task-io-us.h"
 #include "hev-fsh-protocol.h"
 
 #include "hev-fsh-client-sock-connect.h"
@@ -25,15 +26,22 @@ hev_fsh_client_sock_connect_task_entry (void *data)
 {
     HevFshClientSockConnect *self = data;
     HevFshClientBase *base = data;
+    int sfd;
+    int bfd;
     int res;
 
     res = hev_fsh_client_connect_send_connect (&self->base);
     if (res < 0)
         goto exit;
 
-    hev_task_add_fd (hev_task_self (), self->fd, POLLIN | POLLOUT);
-    hev_task_io_splice (base->fd, base->fd, self->fd, self->fd, 8192,
-                        io_yielder, self);
+    sfd = self->fd;
+    bfd = base->fd;
+    hev_task_add_fd (hev_task_self (), sfd, POLLIN | POLLOUT);
+
+    if (hev_fsh_config_is_ugly_ktls (base->config))
+        hev_task_io_us_splice (bfd, bfd, sfd, sfd, 8192, io_yielder, self);
+    else
+        hev_task_io_splice (bfd, bfd, sfd, sfd, 8192, io_yielder, self);
 
 exit:
     hev_object_unref (HEV_OBJECT (self));
