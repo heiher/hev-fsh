@@ -16,6 +16,7 @@
 #include <hev-memory-allocator.h>
 
 #include "hev-logger.h"
+#include "hev-task-io-us.h"
 
 #include "hev-fsh-client-port-accept.h"
 
@@ -81,7 +82,10 @@ hev_fsh_client_port_accept_task_entry (void *data)
     if (res < 0)
         goto quit_close;
 
-    hev_task_io_splice (rfd, rfd, lfd, lfd, 8192, io_yielder, self);
+    if (hev_fsh_config_is_ugly_ktls (base->config))
+        hev_task_io_us_splice (rfd, rfd, lfd, lfd, 8192, io_yielder, self);
+    else
+        hev_task_io_splice (rfd, rfd, lfd, lfd, 8192, io_yielder, self);
 
 quit_close:
     close (lfd);
