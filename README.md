@@ -162,6 +162,7 @@ fsh -p [::1]:2200:[::1]:22 127.0.0.1/8b9bf4e7-b2b2-4115-ac97-0c7f69433bc4
 ## Classes
 
 ```
+          +-> HevSocks5 -> HevSocks5Server -> HevSocks5ServerUS
 HevObject +-> HevFshBase +-> HevFshServer
           |              +-> HevFshClient
           +-> HevFshSessionManager
