@@ -17,6 +17,7 @@
 
 #include "hev-logger.h"
 #include "hev-socks5-server.h"
+#include "hev-socks5-server-us.h"
 
 #include "hev-fsh-client-sock-accept.h"
 
@@ -32,7 +33,10 @@ hev_fsh_client_sock_accept_task_entry (void *data)
     if (res < 0)
         goto quit;
 
-    socks = hev_socks5_server_new (base->fd);
+    if (hev_fsh_config_is_ugly_ktls (base->config))
+        socks = hev_socks5_server_us_new (base->fd);
+    else
+        socks = hev_socks5_server_new (base->fd);
     if (!socks)
         goto quit;
 
