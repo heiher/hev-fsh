@@ -29,6 +29,7 @@
 #include <hev-memory-allocator.h>
 
 #include "hev-logger.h"
+#include "hev-task-io-us.h"
 #include "hev-fsh-protocol.h"
 
 #include "hev-fsh-client-term-accept.h"
@@ -150,7 +151,11 @@ hev_fsh_client_term_accept_task_entry (void *data)
         goto quit_close;
 
     hev_task_add_fd (hev_task_self (), pfd, POLLIN | POLLOUT);
-    hev_task_io_splice (sfd, sfd, pfd, pfd, 8192, io_yielder, self);
+
+    if (hev_fsh_config_is_ugly_ktls (base->config))
+        hev_task_io_us_splice (sfd, sfd, pfd, pfd, 8192, io_yielder, self);
+    else
+        hev_task_io_splice (sfd, sfd, pfd, pfd, 8192, io_yielder, self);
 
 quit_close:
     close (pfd);
