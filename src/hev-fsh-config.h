@@ -98,4 +98,6 @@ struct sockaddr *hev_fsh_config_get_server_sockaddr (HevFshConfig *self,
 struct sockaddr *hev_fsh_config_get_local_sockaddr (HevFshConfig *self,
                                                     socklen_t *len);
 
+int hev_fsh_config_is_ugly_ktls (HevFshConfig *self);
+
 #endif /* __HEV_CONFIG_H__ */

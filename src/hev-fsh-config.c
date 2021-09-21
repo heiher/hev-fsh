@@ -14,6 +14,7 @@
 #include <arpa/inet.h>
 #include <sys/types.h>
 #include <sys/socket.h>
+#include <sys/utsname.h>
 
 #include <hev-task-dns.h>
 #include <hev-task-call.h>
@@ -30,6 +31,7 @@ struct _HevFshConfig
     int crypto;
     int ip_type;
     int log_level;
+    int ugly_ktls;
 
     const char *server_address;
     const char *server_port;
@@ -218,14 +220,36 @@ hev_fsh_config_get_key (HevFshConfig *self)
     return NULL;
 }
 
+static int
+is_ugly_ktls (void)
+{
+#ifdef __linux__
+    struct utsname u;
+    int res;
+
+    res = uname (&u);
+    if (res < 0)
+        return 1;
+
+    /* The kernel TLS with splice syscall is not working before v5.14. */
+    res = strcmp (u.release, "5.14");
+    if (res < 0)
+        return 1;
+#endif
+
+    return 0;
+}
+
 void
 hev_fsh_config_set_key (HevFshConfig *self, HevFshConfigKey *val)
 {
     if (val) {
         self->crypto = 1;
+        self->ugly_ktls = is_ugly_ktls ();
         memcpy (&self->key, val, sizeof (self->key));
     } else {
         self->crypto = 0;
+        self->ugly_ktls = 0;
     }
 }
 
@@ -437,4 +461,10 @@ struct sockaddr *
 hev_fsh_config_get_local_sockaddr (HevFshConfig *self, socklen_t *len)
 {
     return parse_sockaddr (len, self->local_address, self->local_port);
+}
+
+int
+hev_fsh_config_is_ugly_ktls (HevFshConfig *self)
+{
+    return self->ugly_ktls;
 }
