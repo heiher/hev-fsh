@@ -18,6 +18,7 @@
 #include <hev-memory-allocator.h>
 
 #include "hev-logger.h"
+#include "hev-task-io-us.h"
 #include "hev-fsh-protocol.h"
 
 #include "hev-fsh-client-port-connect.h"
@@ -33,6 +34,7 @@ hev_fsh_client_port_connect_task_entry (void *data)
     int port;
     int ifd;
     int ofd;
+    int bfd;
     int res;
 
     res = hev_fsh_client_connect_send_connect (&self->base);
@@ -44,6 +46,7 @@ hev_fsh_client_port_connect_task_entry (void *data)
 
     __builtin_bzero (mpinfo.addr, sizeof (mpinfo.addr));
     mpinfo.port = htons (port);
+    bfd = base->fd;
 
     if (inet_pton (AF_INET, addr, mpinfo.addr) == 1) {
         mpinfo.type = 4;
@@ -53,8 +56,8 @@ hev_fsh_client_port_connect_task_entry (void *data)
     }
 
     /* send message port info */
-    res = hev_task_io_socket_send (base->fd, &mpinfo, sizeof (mpinfo),
-                                   MSG_WAITALL, io_yielder, self);
+    res = hev_task_io_socket_send (bfd, &mpinfo, sizeof (mpinfo), MSG_WAITALL,
+                                   io_yielder, self);
     if (res <= 0)
         goto exit;
 
@@ -81,7 +84,10 @@ hev_fsh_client_port_connect_task_entry (void *data)
         hev_task_add_fd (task, ifd, POLLIN | POLLOUT);
     }
 
-    hev_task_io_splice (base->fd, base->fd, ifd, ofd, 8192, io_yielder, self);
+    if (hev_fsh_config_is_ugly_ktls (base->config))
+        hev_task_io_us_splice (bfd, bfd, ifd, ofd, 8192, io_yielder, self);
+    else
+        hev_task_io_splice (bfd, bfd, ifd, ofd, 8192, io_yielder, self);
 
 exit:
     hev_object_unref (HEV_OBJECT (self));
