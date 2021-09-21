@@ -19,6 +19,7 @@
 #include <hev-memory-allocator.h>
 
 #include "hev-logger.h"
+#include "hev-task-io-us.h"
 #include "hev-fsh-protocol.h"
 
 #include "hev-fsh-client-term-connect.h"
@@ -33,6 +34,7 @@ hev_fsh_client_term_connect_task_entry (void *data)
     struct termios term_rsh;
     struct termios term;
     int res;
+    int fd;
 
     res = hev_fsh_client_connect_send_connect (&self->base);
     if (res < 0)
@@ -42,12 +44,13 @@ hev_fsh_client_term_connect_task_entry (void *data)
     if (res < 0)
         goto exit;
 
+    fd = base->fd;
     mtinfo.rows = win_size.ws_row;
     mtinfo.columns = win_size.ws_col;
 
     /* send message term info */
-    res = hev_task_io_socket_send (base->fd, &mtinfo, sizeof (mtinfo),
-                                   MSG_WAITALL, io_yielder, self);
+    res = hev_task_io_socket_send (fd, &mtinfo, sizeof (mtinfo), MSG_WAITALL,
+                                   io_yielder, self);
     if (res <= 0)
         goto exit;
 
@@ -72,7 +75,10 @@ hev_fsh_client_term_connect_task_entry (void *data)
     if (res < 0)
         goto exit;
 
-    hev_task_io_splice (base->fd, base->fd, 0, 1, 8192, io_yielder, self);
+    if (hev_fsh_config_is_ugly_ktls (base->config))
+        hev_task_io_us_splice (fd, fd, 0, 1, 8192, io_yielder, self);
+    else
+        hev_task_io_splice (fd, fd, 0, 1, 8192, io_yielder, self);
 
     tcsetattr (0, TCSADRAIN, &term);
 
