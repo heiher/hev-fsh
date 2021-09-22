@@ -15,6 +15,7 @@
 #include <unistd.h>
 #include <arpa/inet.h>
 #include <sys/socket.h>
+#include <sys/resource.h>
 
 #include <hev-task-system.h>
 
@@ -512,6 +513,17 @@ signal_handler (int signum)
         hev_fsh_base_stop (instance);
 }
 
+static void
+set_limit_nofile (void)
+{
+    struct rlimit limit = {
+        .rlim_cur = 65536,
+        .rlim_max = 65536,
+    };
+
+    setrlimit (RLIMIT_NOFILE, &limit);
+}
+
 int
 main (int argc, char *argv[])
 {
@@ -531,6 +543,8 @@ main (int argc, char *argv[])
         show_help ();
         return -1;
     }
+
+    set_limit_nofile ();
 
     mode = hev_fsh_config_get_mode (config);
     path = hev_fsh_config_get_log_path (config);
