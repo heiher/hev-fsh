@@ -31,7 +31,7 @@ hev_fsh_client_forward_write_login (HevFshClientForward *self)
 
     LOG_D ("%p fsh client forward write login", self);
 
-    msg.ver = token ? 2 : 1;
+    msg.ver = token ? 3 : 1;
     msg.cmd = HEV_FSH_CMD_LOGIN;
     hev_task_mutex_lock (&self->wlock);
     res = hev_task_io_socket_send (self->base.fd, &msg, sizeof (msg),
@@ -124,7 +124,7 @@ hev_fsh_client_forward_write_keep_alive (HevFshClientForward *self)
 }
 
 static void
-hev_fsh_client_forward_accept (HevFshClientForward *self)
+hev_fsh_client_forward_accept (HevFshClientForward *self, HevFshToken token)
 {
     HevFshClientBase *base = HEV_FSH_CLIENT_BASE (self);
     HevFshClientBase *accept;
@@ -135,13 +135,13 @@ hev_fsh_client_forward_accept (HevFshClientForward *self)
     mode = hev_fsh_config_get_mode (base->config);
     switch (mode) {
     case HEV_FSH_CONFIG_MODE_FORWARDER_PORT:
-        accept = hev_fsh_client_port_accept_new (base->config, self->token);
+        accept = hev_fsh_client_port_accept_new (base->config, token);
         break;
     case HEV_FSH_CONFIG_MODE_FORWARDER_SOCK:
-        accept = hev_fsh_client_sock_accept_new (base->config, self->token);
+        accept = hev_fsh_client_sock_accept_new (base->config, token);
         break;
     default:
-        accept = hev_fsh_client_term_accept_new (base->config, self->token);
+        accept = hev_fsh_client_term_accept_new (base->config, token);
         break;
     }
 
@@ -180,11 +180,7 @@ hev_fsh_client_forward_dispatch (HevFshClientForward *self)
         if (res <= 0)
             return;
 
-        res = memcmp (token.token, self->token, sizeof (HevFshToken));
-        if (res != 0)
-            return;
-
-        hev_fsh_client_forward_accept (self);
+        hev_fsh_client_forward_accept (self, token.token);
     }
 }
 
