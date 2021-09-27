@@ -198,7 +198,6 @@ hev_fsh_session_do_connect (HevFshSession *self)
 {
     HevFshMessageToken mt;
     HevFshSession *s;
-    int ver;
     int cmd;
     int res;
 
@@ -216,9 +215,13 @@ hev_fsh_session_do_connect (HevFshSession *self)
         return STEP_CLOSE_SESSION;
     }
 
-    ver = s->msg_ver;
+    if (s->msg_ver == 3) {
+        /* gen temp token */
+        hev_fsh_protocol_token_generate (mt.token);
+    }
+
     cmd = HEV_FSH_CMD_CONNECT;
-    res = hev_fsh_session_write_message (s, ver, cmd, &mt, sizeof (mt));
+    res = hev_fsh_session_write_message (s, s->msg_ver, cmd, &mt, sizeof (mt));
     if (res <= 0)
         return STEP_CLOSE_SESSION;
 
