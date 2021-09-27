@@ -234,8 +234,10 @@ hev_fsh_session_do_connect (HevFshSession *self)
 static int
 hev_fsh_session_do_accept (HevFshSession *self)
 {
+    HevFshSessionManager *manager = self->manager;
     HevFshMessageToken mt;
     HevFshSession *s;
+    unsigned timeout;
     int res;
 
     res = hev_task_io_socket_recv (self->client_fd, &mt, sizeof (mt),
@@ -243,16 +245,22 @@ hev_fsh_session_do_accept (HevFshSession *self)
     if (res <= 0)
         return STEP_CLOSE_SESSION;
 
-    s = hev_fsh_session_manager_find (self->manager, TYPE_CONNECT, &mt.token);
-    if (!s) {
-        sleep_wait (1500);
-        return STEP_CLOSE_SESSION;
+    /* wait for connect */
+    timeout = self->base.timeout;
+    while (timeout) {
+        s = hev_fsh_session_manager_find (manager, TYPE_CONNECT, &mt.token);
+        if (s)
+            break;
+        timeout = hev_task_sleep (timeout);
     }
+
+    if (!s)
+        return STEP_CLOSE_SESSION;
 
     s->type = TYPE_SPLICE;
     s->remote_fd = self->client_fd;
-    hev_fsh_session_manager_remove (self->manager, s);
-    hev_fsh_session_manager_insert (self->manager, s);
+    hev_fsh_session_manager_remove (manager, s);
+    hev_fsh_session_manager_insert (manager, s);
     hev_task_del_fd (hev_task_self (), self->client_fd);
     hev_task_add_fd (HEV_FSH_IO (s)->task, s->remote_fd, POLLIN | POLLOUT);
     hev_task_wakeup (HEV_FSH_IO (s)->task);
@@ -288,7 +296,7 @@ hev_fsh_session_do_splice (HevFshSession *self)
 {
     unsigned timeout = self->base.timeout;
 
-    /* wait for remote fd */
+    /* wait for accept */
     while (timeout) {
         if (self->remote_fd >= 0)
             break;
