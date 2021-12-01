@@ -82,7 +82,7 @@ hev_fsh_config_new (void)
         return NULL;
     }
 
-    self->timeout = 300;
+    self->timeout = 120;
     self->server_port = "6339";
     self->local_address = "127.0.0.1";
 
