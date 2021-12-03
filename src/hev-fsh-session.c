@@ -32,18 +32,6 @@ enum
     TYPE_CLOSED,
 };
 
-enum
-{
-    STEP_NULL,
-    STEP_READ_MESSAGE,
-    STEP_DO_LOGIN,
-    STEP_DO_CONNECT,
-    STEP_DO_SPLICE,
-    STEP_DO_ACCEPT,
-    STEP_DO_KEEP_ALIVE,
-    STEP_CLOSE_SESSION,
-};
-
 static void
 sleep_wait (unsigned int milliseconds)
 {
@@ -112,34 +100,7 @@ hev_fsh_session_write_message (HevFshSession *self, int ver, int cmd,
 }
 
 static int
-hev_fsh_session_read_message (HevFshSession *self)
-{
-    HevFshMessage msg;
-    int res;
-
-    res = hev_task_io_socket_recv (self->client_fd, &msg, sizeof (msg),
-                                   MSG_WAITALL, io_yielder, self);
-    if (res <= 0)
-        return STEP_CLOSE_SESSION;
-
-    self->msg_ver = msg.ver;
-
-    switch (msg.cmd) {
-    case HEV_FSH_CMD_LOGIN:
-        return STEP_DO_LOGIN;
-    case HEV_FSH_CMD_CONNECT:
-        return STEP_DO_CONNECT;
-    case HEV_FSH_CMD_ACCEPT:
-        return STEP_DO_ACCEPT;
-    case HEV_FSH_CMD_KEEP_ALIVE:
-        return STEP_DO_KEEP_ALIVE;
-    }
-
-    return STEP_CLOSE_SESSION;
-}
-
-static int
-hev_fsh_session_do_login (HevFshSession *self)
+hev_fsh_session_login (HevFshSession *self, int msg_ver)
 {
     HevFshMessageToken mt;
     HevFshSession *s;
@@ -147,9 +108,9 @@ hev_fsh_session_do_login (HevFshSession *self)
     int res;
 
     if (self->type)
-        return STEP_CLOSE_SESSION;
+        return -1;
 
-    if (self->msg_ver == 1) {
+    if (msg_ver == 1) {
         hev_fsh_protocol_token_generate (self->token);
     } else {
         HevFshToken zt = { 0 };
@@ -157,7 +118,7 @@ hev_fsh_session_do_login (HevFshSession *self)
         res = hev_task_io_socket_recv (self->client_fd, &mt, sizeof (mt),
                                        MSG_WAITALL, io_yielder, self);
         if (res <= 0)
-            return STEP_CLOSE_SESSION;
+            return -1;
 
         if (memcmp (zt, mt.token, sizeof (HevFshToken)) == 0) {
             hev_fsh_protocol_token_generate (self->token);
@@ -183,119 +144,19 @@ hev_fsh_session_do_login (HevFshSession *self)
     memcpy (mt.token, self->token, sizeof (HevFshToken));
     res = hev_fsh_session_write_message (self, 1, cmd, &mt, sizeof (mt));
     if (res <= 0)
-        return STEP_CLOSE_SESSION;
+        return -1;
 
     self->is_mgr = 1;
     self->type = TYPE_FORWARD;
+    self->is_temp_token = (msg_ver == 3) ? 1 : 0;
     hev_fsh_session_manager_insert (self->manager, self);
     hev_fsh_session_log (self, "L");
 
-    return STEP_READ_MESSAGE;
+    return 0;
 }
 
-static int
-hev_fsh_session_do_connect (HevFshSession *self)
-{
-    HevFshMessageToken mt;
-    HevFshSession *s;
-    int cmd;
-    int res;
-
-    if (self->type)
-        return STEP_CLOSE_SESSION;
-
-    res = hev_task_io_socket_recv (self->client_fd, &mt, sizeof (mt),
-                                   MSG_WAITALL, io_yielder, self);
-    if (res <= 0)
-        return STEP_CLOSE_SESSION;
-
-    s = hev_fsh_session_manager_find (self->manager, TYPE_FORWARD, &mt.token);
-    if (!s) {
-        sleep_wait (1500);
-        return STEP_CLOSE_SESSION;
-    }
-
-    if (s->msg_ver == 3) {
-        /* gen temp token */
-        hev_fsh_protocol_token_generate (mt.token);
-    }
-
-    cmd = HEV_FSH_CMD_CONNECT;
-    res = hev_fsh_session_write_message (s, s->msg_ver, cmd, &mt, sizeof (mt));
-    if (res <= 0)
-        return STEP_CLOSE_SESSION;
-
-    self->is_mgr = 1;
-    self->type = TYPE_CONNECT;
-    memcpy (self->token, mt.token, sizeof (HevFshToken));
-    hev_fsh_session_manager_insert (self->manager, self);
-    hev_fsh_session_log (self, "C");
-
-    return STEP_DO_SPLICE;
-}
-
-static int
-hev_fsh_session_do_accept (HevFshSession *self)
-{
-    HevFshSessionManager *manager = self->manager;
-    HevFshMessageToken mt;
-    HevFshSession *s;
-    unsigned timeout;
-    int res;
-
-    res = hev_task_io_socket_recv (self->client_fd, &mt, sizeof (mt),
-                                   MSG_WAITALL, io_yielder, self);
-    if (res <= 0)
-        return STEP_CLOSE_SESSION;
-
-    /* wait for connect */
-    timeout = self->base.timeout;
-    while (timeout) {
-        s = hev_fsh_session_manager_find (manager, TYPE_CONNECT, &mt.token);
-        if (s)
-            break;
-        timeout = hev_task_sleep (timeout);
-    }
-
-    if (!s)
-        return STEP_CLOSE_SESSION;
-
-    s->type = TYPE_SPLICE;
-    s->remote_fd = self->client_fd;
-    hev_fsh_session_manager_remove (manager, s);
-    hev_fsh_session_manager_insert (manager, s);
-    hev_task_del_fd (hev_task_self (), self->client_fd);
-    hev_task_add_fd (HEV_FSH_IO (s)->task, s->remote_fd, POLLIN | POLLOUT);
-    hev_task_wakeup (HEV_FSH_IO (s)->task);
-
-    self->client_fd = -1;
-    return STEP_CLOSE_SESSION;
-}
-
-static int
-hev_fsh_session_do_keep_alive (HevFshSession *self)
-{
-    HevFshMessage msg;
-    int res;
-
-    if (self->msg_ver == 1)
-        return STEP_READ_MESSAGE;
-
-    msg.ver = 1;
-    msg.cmd = HEV_FSH_CMD_KEEP_ALIVE;
-
-    hev_task_mutex_lock (&self->wlock);
-    res = hev_task_io_socket_send (self->client_fd, &msg, sizeof (msg),
-                                   MSG_WAITALL, io_yielder, self);
-    hev_task_mutex_unlock (&self->wlock);
-    if (res <= 0)
-        return STEP_CLOSE_SESSION;
-
-    return STEP_READ_MESSAGE;
-}
-
-static int
-hev_fsh_session_do_splice (HevFshSession *self)
+static void
+hev_fsh_session_splice (HevFshSession *self)
 {
     unsigned timeout = self->base.timeout;
 
@@ -308,11 +169,110 @@ hev_fsh_session_do_splice (HevFshSession *self)
 
     hev_task_io_splice (self->client_fd, self->client_fd, self->remote_fd,
                         self->remote_fd, 8192, io_yielder, self);
-
-    return STEP_CLOSE_SESSION;
 }
 
 static int
+hev_fsh_session_connect (HevFshSession *self)
+{
+    HevFshMessageToken mt;
+    HevFshSession *s;
+    int cmd;
+    int res;
+
+    if (self->type)
+        return -1;
+
+    res = hev_task_io_socket_recv (self->client_fd, &mt, sizeof (mt),
+                                   MSG_WAITALL, io_yielder, self);
+    if (res <= 0)
+        return -1;
+
+    s = hev_fsh_session_manager_find (self->manager, TYPE_FORWARD, &mt.token);
+    if (!s) {
+        sleep_wait (1500);
+        return -1;
+    }
+
+    if (s->is_temp_token)
+        hev_fsh_protocol_token_generate (mt.token);
+
+    cmd = HEV_FSH_CMD_CONNECT;
+    res = hev_fsh_session_write_message (s, 1, cmd, &mt, sizeof (mt));
+    if (res <= 0)
+        return -1;
+
+    self->is_mgr = 1;
+    self->type = TYPE_CONNECT;
+    memcpy (self->token, mt.token, sizeof (HevFshToken));
+    hev_fsh_session_manager_insert (self->manager, self);
+    hev_fsh_session_log (self, "C");
+
+    hev_fsh_session_splice (self);
+
+    return -1;
+}
+
+static int
+hev_fsh_session_accept (HevFshSession *self)
+{
+    HevFshSessionManager *manager = self->manager;
+    HevFshMessageToken mt;
+    HevFshSession *s;
+    unsigned timeout;
+    int res;
+
+    res = hev_task_io_socket_recv (self->client_fd, &mt, sizeof (mt),
+                                   MSG_WAITALL, io_yielder, self);
+    if (res <= 0)
+        return -1;
+
+    /* wait for connect */
+    timeout = self->base.timeout;
+    while (timeout) {
+        s = hev_fsh_session_manager_find (manager, TYPE_CONNECT, &mt.token);
+        if (s)
+            break;
+        timeout = hev_task_sleep (timeout);
+    }
+
+    if (!s)
+        return -1;
+
+    s->type = TYPE_SPLICE;
+    s->remote_fd = self->client_fd;
+    hev_fsh_session_manager_remove (manager, s);
+    hev_fsh_session_manager_insert (manager, s);
+    hev_task_del_fd (hev_task_self (), self->client_fd);
+    hev_task_add_fd (HEV_FSH_IO (s)->task, s->remote_fd, POLLIN | POLLOUT);
+    hev_task_wakeup (HEV_FSH_IO (s)->task);
+
+    self->client_fd = -1;
+    return -1;
+}
+
+static int
+hev_fsh_session_keep_alive (HevFshSession *self, int msg_ver)
+{
+    HevFshMessage msg;
+    int res;
+
+    if (msg_ver == 1)
+        return 0;
+
+    msg.ver = 1;
+    msg.cmd = HEV_FSH_CMD_KEEP_ALIVE;
+
+    hev_task_mutex_lock (&self->wlock);
+    res = hev_task_io_socket_send (self->client_fd, &msg, sizeof (msg),
+                                   MSG_WAITALL, io_yielder, self);
+    hev_task_mutex_unlock (&self->wlock);
+    if (res <= 0)
+        return -1;
+
+    return 0;
+}
+
+static void
 hev_fsh_session_close_session (HevFshSession *self)
 {
     if (self->type)
@@ -322,43 +282,46 @@ hev_fsh_session_close_session (HevFshSession *self)
         hev_fsh_session_manager_remove (self->manager, self);
 
     hev_object_unref (HEV_OBJECT (self));
-
-    return STEP_NULL;
 }
 
 static void
 hev_fsh_session_task_entry (void *data)
 {
     HevFshSession *self = data;
-    int step = STEP_READ_MESSAGE;
 
     hev_task_add_fd (hev_task_self (), self->client_fd, POLLIN | POLLOUT);
 
-    while (step) {
-        switch (step) {
-        case STEP_READ_MESSAGE:
-            step = hev_fsh_session_read_message (self);
+    for (;;) {
+        HevFshMessage msg;
+        int res;
+
+        res = hev_task_io_socket_recv (self->client_fd, &msg, sizeof (msg),
+                                       MSG_WAITALL, io_yielder, self);
+
+        if (res < 0) {
+            hev_fsh_session_close_session (self);
             break;
-        case STEP_DO_LOGIN:
-            step = hev_fsh_session_do_login (self);
+        }
+
+        switch (msg.cmd) {
+        case HEV_FSH_CMD_LOGIN:
+            res = hev_fsh_session_login (self, msg.ver);
             break;
-        case STEP_DO_CONNECT:
-            step = hev_fsh_session_do_connect (self);
+        case HEV_FSH_CMD_CONNECT:
+            res = hev_fsh_session_connect (self);
             break;
-        case STEP_DO_SPLICE:
-            step = hev_fsh_session_do_splice (self);
+        case HEV_FSH_CMD_ACCEPT:
+            res = hev_fsh_session_accept (self);
             break;
-        case STEP_DO_ACCEPT:
-            step = hev_fsh_session_do_accept (self);
-            break;
-        case STEP_DO_KEEP_ALIVE:
-            step = hev_fsh_session_do_keep_alive (self);
-            break;
-        case STEP_CLOSE_SESSION:
-            step = hev_fsh_session_close_session (self);
+        case HEV_FSH_CMD_KEEP_ALIVE:
+            res = hev_fsh_session_keep_alive (self, msg.ver);
             break;
         default:
-            step = STEP_NULL;
+            res = -1;
+        }
+
+        if (res < 0) {
+            hev_fsh_session_close_session (self);
             break;
         }
     }

@@ -37,8 +37,8 @@ struct _HevFshSession
     int remote_fd;
 
     unsigned char type;
-    unsigned char is_mgr;
-    unsigned char msg_ver;
+    unsigned char is_mgr : 1;
+    unsigned char is_temp_token : 1;
 
     HevFshToken token;
     HevTaskMutex wlock;
