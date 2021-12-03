@@ -18,37 +18,17 @@
 void
 hev_random_get_bytes (void *buf, size_t size)
 {
-    int fd;
-    size_t i;
-    unsigned char *cp = buf;
     static int init = 0;
-
-    fd = open ("/dev/urandom", O_RDONLY | O_CLOEXEC);
-    if (fd < 0)
-        fd = open ("/dev/random", O_RDONLY | O_NONBLOCK | O_CLOEXEC);
-
-    if (fd >= 0) {
-        size_t n = size;
-        int lose_counter = 0;
-
-        while (n > 0) {
-            ssize_t x = read (fd, cp, n);
-            if (x <= 0) {
-                if (lose_counter++ > 16)
-                    break;
-                continue;
-            }
-            n -= x;
-            cp += x;
-            lose_counter = 0;
-        }
-
-        close (fd);
-        return;
-    }
+    static int fd;
+    unsigned char *cp = buf;
+    size_t i;
 
     if (!init) {
         struct timeval tv;
+
+        fd = open ("/dev/urandom", O_RDONLY | O_CLOEXEC);
+        if (fd < 0)
+            fd = open ("/dev/random", O_RDONLY | O_NONBLOCK | O_CLOEXEC);
 
         gettimeofday (&tv, 0);
         srand (tv.tv_sec ^ tv.tv_usec);
@@ -58,6 +38,25 @@ hev_random_get_bytes (void *buf, size_t size)
             rand ();
 
         init = 1;
+    }
+
+    if (fd >= 0) {
+        int lose_counter = 0;
+
+        while (size > 0) {
+            ssize_t x = read (fd, cp, size);
+            if (x <= 0) {
+                if (lose_counter++ > 16)
+                    break;
+                continue;
+            }
+            size -= x;
+            cp += x;
+            lose_counter = 0;
+        }
+
+        if (size == 0)
+            return;
     }
 
     for (i = 0; i < size; i++)
