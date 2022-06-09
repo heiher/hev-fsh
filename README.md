@@ -186,4 +186,4 @@ HevObject +-> HevFshBase +-> HevFshServer
 * **hev** - https://hev.cc
 
 ## License
-LGPL
+MIT
