@@ -22,6 +22,7 @@ TARGET=$(BINDIR)/hev-fsh
 THIRDPARTS=$(THIRDPARTDIR)/hev-task-system
 
 -include build.mk
+CCFLAGS+=$(VERSION_CFLAGS)
 CCSRCS=$(filter %.c,$(SRCFILES))
 ASSRCS=$(filter %.S,$(SRCFILES))
 LDOBJS=$(patsubst $(SRCDIR)/%.c,$(BUILDDIR)/%.o,$(CCSRCS)) \

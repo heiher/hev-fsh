@@ -48,8 +48,8 @@ show_help (void)
              "  Forwarder: -f -x SERVER_ADDR[:SERVER_PORT/TOKEN]\n"
              "  Connector: -x [LOCAL_ADDR:]LOCAL_PORT "
              "SERVER_ADDR[:SERVER_PORT]/TOKEN\n");
-    fprintf (stderr, "Version: %d.%d.%d\n", MAJOR_VERSION, MINOR_VERSION,
-             MICRO_VERSION);
+    fprintf (stderr, "Version: %u.%u.%u %s\n", MAJOR_VERSION, MINOR_VERSION,
+             MICRO_VERSION, COMMIT_ID);
 }
 
 static char *
