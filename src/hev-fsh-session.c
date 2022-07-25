@@ -216,8 +216,8 @@ static int
 hev_fsh_session_accept (HevFshSession *self)
 {
     HevFshSessionManager *manager = self->manager;
+    HevFshSession *s = NULL;
     HevFshMessageToken mt;
-    HevFshSession *s;
     unsigned timeout;
     int res;
 
