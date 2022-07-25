@@ -5,4 +5,4 @@ rwildcard=$(foreach d,$(wildcard $1*), \
           $(filter $(subst *,%,$2),$d))
 
 SRCFILES=$(call rwildcard,$(SRCDIR)/,*.c *.S)
-VERSION_CFLAGS=-DCOMMIT_ID=\"$(shell git -C $(SRCDIR) rev-parse --short HEAD)\"
+VERSION_CFLAGS=-DCOMMIT_ID=\"$(shell git rev-parse --short HEAD)\"
