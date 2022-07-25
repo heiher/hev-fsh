@@ -15,7 +15,7 @@
 #include <signal.h>
 
 #ifdef __linux__
-#include <linux/tls.h>
+#include <linux-tls.h>
 #include <netinet/tcp.h>
 #endif
 
@@ -29,12 +29,12 @@
 
 #include "hev-fsh-client-base.h"
 
-#ifndef TLS_TX
-#define TLS_TX 1
+#ifndef SOL_TLS
+#define SOL_TLS 282
 #endif
 
-#ifndef TLS_RX
-#define TLS_RX 2
+#ifndef TCP_ULP
+#define TCP_ULP 31
 #endif
 
 static int
