@@ -27,6 +27,7 @@ hev_fsh_client_sock_accept_task_entry (void *data)
     HevFshClientSockAccept *self = data;
     HevFshClientBase *base = data;
     HevSocks5Server *socks;
+    int timeout;
     int res;
 
     res = hev_fsh_client_accept_send_accept (&self->base);
@@ -39,6 +40,10 @@ hev_fsh_client_sock_accept_task_entry (void *data)
         socks = hev_socks5_server_new (base->fd);
     if (!socks)
         goto quit;
+
+    timeout = hev_fsh_config_get_timeout (base->config);
+    hev_socks5_set_timeout (HEV_SOCKS5 (socks), timeout * 1000);
+    hev_socks5_server_set_connect_timeout (socks, timeout * 1000);
 
     hev_socks5_server_run (socks);
     hev_object_unref (HEV_OBJECT (socks));
