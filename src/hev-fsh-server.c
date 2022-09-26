@@ -112,7 +112,13 @@ hev_fsh_server_socket (HevFshServer *self, HevFshConfig *config)
     }
 
     if (setsockopt (fd, SOL_SOCKET, SO_REUSEADDR, &reuse, sizeof (int)) < 0) {
-        LOG_E ("%p fsh server socket reuse", self);
+        LOG_E ("%p fsh server socket reuse addr", self);
+        close (fd);
+        return -1;
+    }
+
+    if (setsockopt (fd, SOL_SOCKET, SO_REUSEPORT, &reuse, sizeof (int)) < 0) {
+        LOG_E ("%p fsh server socket reuse port", self);
         close (fd);
         return -1;
     }
