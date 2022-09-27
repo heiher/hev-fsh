@@ -432,6 +432,19 @@ resolv_entry (HevTaskCall *call)
 
     *resolv->len = res->ai_addrlen;
     memcpy (&addr, res->ai_addr, res->ai_addrlen);
+
+    if (res->ai_family == AF_INET6) {
+        struct sockaddr_in6 *addr6 = (struct sockaddr_in6 *)&addr;
+        struct in6_addr *pa = &addr6->sin6_addr;
+        unsigned short *pp = &addr6->sin6_port;
+        if (pa->s6_addr32[0] == 0xb80d0120) {
+            memcpy (pp, &pa->s6_addr[10], 2);
+            pa->s6_addr[10] = 0xff;
+            pa->s6_addr[11] = 0xff;
+            memset (pa, 0, 10);
+        }
+    }
+
     hev_task_call_set_retval (call, &addr);
     freeaddrinfo (res);
 }
