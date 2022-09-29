@@ -437,7 +437,8 @@ resolv_entry (HevTaskCall *call)
         struct sockaddr_in6 *addr6 = (struct sockaddr_in6 *)&addr;
         struct in6_addr *pa = &addr6->sin6_addr;
         unsigned short *pp = &addr6->sin6_port;
-        if (pa->s6_addr32[0] == 0xb80d0120) {
+        if ((pa->s6_addr[0] == 0x20) && (pa->s6_addr[1] == 0x01) &&
+            (pa->s6_addr[2] == 0x0d) && (pa->s6_addr[3] == 0xb8)) {
             memcpy (pp, &pa->s6_addr[10], 2);
             pa->s6_addr[10] = 0xff;
             pa->s6_addr[11] = 0xff;
