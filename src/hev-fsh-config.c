@@ -7,10 +7,6 @@
  ============================================================================
  */
 
-#ifdef __linux__
-#define _GNU_SOURCE
-#endif
-
 #include <netdb.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -22,6 +18,7 @@
 
 #include <hev-task-dns.h>
 #include <hev-task-call.h>
+#include <hev-strverscmp.h>
 
 #include "hev-fsh-config.h"
 #include "hev-memory-allocator.h"
@@ -236,7 +233,7 @@ is_ugly_ktls (void)
         return 1;
 
     /* The kernel TLS with splice syscall is not working before v5.14. */
-    res = strverscmp (u.release, "5.14");
+    res = hev_strverscmp (u.release, "5.14");
     if (res < 0)
         return 1;
 #endif
