@@ -34,6 +34,12 @@ LINKMSG="\e[1;34mLINK\e[0m  \e[1;32m%s\e[0m\n"
 STRIPMSG="\e[1;34mSTRIP\e[0m \e[1;32m%s\e[0m\n"
 CLEANMSG="\e[1;34mCLEAN\e[0m %s\n"
 
+ENABLE_STATIC :=
+ifeq ($(ENABLE_STATIC),1)
+	CCFLAGS+=-static
+	LDFLAGS+=-static
+endif
+
 V :=
 ECHO_PREFIX := @
 ifeq ($(V),1)
