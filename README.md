@@ -59,6 +59,9 @@ fsh -s
 
 # Listen on specific address:port
 fsh -s 10.0.0.1:8000
+
+# With token allow list
+fsh -s -a tokens-allow-list
 ```
 
 **Forwarder**:
@@ -165,6 +168,7 @@ fsh -p [::1]:2200:[::1]:22 127.0.0.1/8b9bf4e7-b2b2-4115-ac97-0c7f69433bc4
           +-> HevSocks5 -> HevSocks5Server -> HevSocks5ServerUS
 HevObject +-> HevFshBase +-> HevFshServer
           |              +-> HevFshClient
+          +-> HevFshTokenManager
           +-> HevFshSessionManager
           +-> HevFshClientFactory
           +-> HevFshIO +-> HevFshSession
