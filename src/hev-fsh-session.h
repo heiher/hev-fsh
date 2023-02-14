@@ -2,7 +2,7 @@
  ============================================================================
  Name        : hev-fsh-session.h
  Author      : hev <r@hev.cc>
- Copyright   : Copyright (c) 2017 - 2021 xyz
+ Copyright   : Copyright (c) 2017 - 2023 xyz
  Description : Fsh session
  ============================================================================
  */
@@ -16,6 +16,7 @@
 #include "hev-rbtree.h"
 #include "hev-fsh-io.h"
 #include "hev-fsh-protocol.h"
+#include "hev-fsh-token-manager.h"
 #include "hev-fsh-session-manager.h"
 
 #ifdef __cplusplus
@@ -44,7 +45,8 @@ struct _HevFshSession
     HevTaskMutex wlock;
     HevRBTreeNode node;
 
-    HevFshSessionManager *manager;
+    HevFshTokenManager *t_mgr;
+    HevFshSessionManager *s_mgr;
 };
 
 struct _HevFshSessionClass
@@ -55,11 +57,12 @@ struct _HevFshSessionClass
 HevObjectClass *hev_fsh_session_class (void);
 
 int hev_fsh_session_construct (HevFshSession *self, int fd,
-                               unsigned int timeout,
-                               HevFshSessionManager *manager);
+                               unsigned int timeout, HevFshTokenManager *t_mgr,
+                               HevFshSessionManager *s_mgr);
 
 HevFshSession *hev_fsh_session_new (int fd, unsigned int timeout,
-                                    HevFshSessionManager *manager);
+                                    HevFshTokenManager *t_mgr,
+                                    HevFshSessionManager *s_mgr);
 
 #ifdef __cplusplus
 }

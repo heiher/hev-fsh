@@ -2,7 +2,7 @@
  ============================================================================
  Name        : hev-fsh-server.c
  Author      : hev <r@hev.cc>
- Copyright   : Copyright (c) 2017 - 2021 xyz
+ Copyright   : Copyright (c) 2017 - 2023 xyz
  Description : Fsh server
  ============================================================================
  */
@@ -41,7 +41,7 @@ hev_fsh_server_task_entry (void *data)
             continue;
         }
 
-        s = hev_fsh_session_new (fd, timeout, self->manager);
+        s = hev_fsh_session_new (fd, timeout, self->t_mgr, self->s_mgr);
         if (!s) {
             close (fd);
             continue;
@@ -49,6 +49,11 @@ hev_fsh_server_task_entry (void *data)
 
         hev_fsh_io_run (HEV_FSH_IO (s));
     }
+}
+
+static void
+hev_fsh_event_task_entry (void *data)
+{
 }
 
 HevFshBase *
@@ -79,8 +84,13 @@ hev_fsh_server_start (HevFshBase *base)
 
     LOG_D ("%p fsh server start", base);
 
-    hev_task_ref (self->task);
-    hev_task_run (self->task, hev_fsh_server_task_entry, self);
+    hev_task_ref (self->main_task);
+    hev_task_run (self->main_task, hev_fsh_server_task_entry, self);
+
+    if (self->event_task) {
+        hev_task_ref (self->event_task);
+        hev_task_run (self->event_task, hev_fsh_event_task_entry, self);
+    }
 }
 
 void
@@ -89,6 +99,17 @@ hev_fsh_server_stop (HevFshBase *base)
     LOG_D ("%p fsh clinet stop", base);
 
     exit (0);
+}
+
+void
+hev_fsh_server_reload (HevFshBase *base)
+{
+    HevFshServer *self = HEV_FSH_SERVER (base);
+
+    LOG_D ("%p fsh clinet reload", base);
+
+    if (self->t_mgr)
+        hev_fsh_token_manager_reload (self->t_mgr);
 }
 
 static int
@@ -141,6 +162,7 @@ hev_fsh_server_socket (HevFshServer *self, HevFshConfig *config)
 int
 hev_fsh_server_construct (HevFshServer *self, HevFshConfig *config)
 {
+    const char *tokens_file;
     int res;
 
     res = hev_fsh_base_construct (&self->base);
@@ -155,17 +177,48 @@ hev_fsh_server_construct (HevFshServer *self, HevFshConfig *config)
     if (self->fd < 0)
         return -1;
 
-    self->task = hev_task_new (HEV_FSH_CONFIG_TASK_STACK_SIZE);
-    if (!self->task) {
+    self->main_task = hev_task_new (HEV_FSH_CONFIG_TASK_STACK_SIZE);
+    if (!self->main_task) {
         close (self->fd);
         return -1;
     }
 
-    self->manager = hev_fsh_session_manager_new ();
-    if (!self->manager) {
-        hev_task_unref (self->task);
+    self->s_mgr = hev_fsh_session_manager_new ();
+    if (!self->s_mgr) {
+        hev_task_unref (self->main_task);
         close (self->fd);
         return -1;
+    }
+
+    tokens_file = hev_fsh_config_get_tokens_file (config);
+    if (tokens_file) {
+        self->event_task = hev_task_new (HEV_FSH_CONFIG_TASK_STACK_SIZE);
+        if (!self->event_task) {
+            hev_object_unref (HEV_OBJECT (self->s_mgr));
+            hev_task_unref (self->main_task);
+            close (self->fd);
+            return -1;
+        }
+
+        self->t_mgr = hev_fsh_token_manager_new (tokens_file);
+        if (!self->t_mgr) {
+            hev_task_unref (self->event_task);
+            hev_object_unref (HEV_OBJECT (self->s_mgr));
+            hev_task_unref (self->main_task);
+            close (self->fd);
+            return -1;
+        }
+        hev_fsh_token_manager_reload (self->t_mgr);
+
+        res = hev_task_io_pipe_pipe (self->pfds);
+        if (res < 0) {
+            hev_object_unref (HEV_OBJECT (self->t_mgr));
+            hev_task_unref (self->event_task);
+            hev_object_unref (HEV_OBJECT (self->s_mgr));
+            hev_task_unref (self->main_task);
+            close (self->fd);
+            return -1;
+        }
     }
 
     self->config = config;
@@ -180,8 +233,15 @@ hev_fsh_server_destruct (HevObject *base)
 
     LOG_D ("%p fsh server destruct", self);
 
-    hev_object_unref (HEV_OBJECT (self->manager));
-    hev_task_unref (self->task);
+    hev_object_unref (HEV_OBJECT (self->s_mgr));
+    if (self->t_mgr)
+        hev_object_unref (HEV_OBJECT (self->t_mgr));
+    if (self->event_task) {
+        hev_task_unref (self->event_task);
+        close (self->pfds[0]);
+        close (self->pfds[1]);
+    }
+    hev_task_unref (self->main_task);
     close (self->fd);
 
     HEV_FSH_BASE_TYPE->finalizer (base);
@@ -205,6 +265,7 @@ hev_fsh_server_class (void)
         bkptr = HEV_FSH_BASE_CLASS (kptr);
         bkptr->start = hev_fsh_server_start;
         bkptr->stop = hev_fsh_server_stop;
+        bkptr->reload = hev_fsh_server_reload;
     }
 
     return okptr;

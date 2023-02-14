@@ -2,7 +2,7 @@
  ============================================================================
  Name        : hev-main.c
  Author      : hev <r@hev.cc>
- Copyright   : Copyright (c) 2017 - 2021 xyz
+ Copyright   : Copyright (c) 2017 - 2023 xyz
  Description : Main
  ============================================================================
  */
@@ -33,7 +33,7 @@ show_help (void)
 {
     fprintf (stderr,
              "Common: [-4 | -6] [-k KEY] [-t TIMEOUT] [-l LOG] [-v]\n"
-             "Server: -s [SERVER_ADDR:SERVER_PORT]\n"
+             "Server: -s [SERVER_ADDR:SERVER_PORT] [-a TOKENS_FILE]\n"
              "Terminal:\n"
              "  Forwarder: -f [-u USER] SERVER_ADDR[:SERVER_PORT/TOKEN]\n"
              "  Connector: SERVER_ADDR[:SERVER_PORT]/TOKEN\n"
@@ -433,7 +433,7 @@ parse_args (HevFshConfig *config, int argc, char *argv[])
     const char *t1 = NULL;
     const char *t2 = NULL;
 
-    while ((opt = getopt (argc, argv, "46k:t:vsfpxl:u:w:b:")) != -1) {
+    while ((opt = getopt (argc, argv, "46k:t:vsfpxl:u:w:b:a:")) != -1) {
         switch (opt) {
         case '4':
             hev_fsh_config_set_ip_type (config, 4);
@@ -474,6 +474,9 @@ parse_args (HevFshConfig *config, int argc, char *argv[])
         case 'b':
             b = optarg;
             break;
+        case 'a':
+            hev_fsh_config_set_tokens_file (config, optarg);
+            break;
         default:
             return -1;
         }
@@ -509,8 +512,16 @@ parse_args (HevFshConfig *config, int argc, char *argv[])
 static void
 signal_handler (int signum)
 {
-    if (instance)
+    if (!instance)
+        return;
+
+    switch (signum) {
+    case SIGUSR1:
+        hev_fsh_base_reload (instance);
+        break;
+    default:
         hev_fsh_base_stop (instance);
+    }
 }
 
 static void
@@ -558,6 +569,8 @@ main (int argc, char *argv[])
     if (signal (SIGINT, signal_handler) == SIG_ERR)
         return -1;
     if (signal (SIGTERM, signal_handler) == SIG_ERR)
+        return -1;
+    if (signal (SIGUSR1, signal_handler) == SIG_ERR)
         return -1;
 
     if (HEV_FSH_CONFIG_MODE_SERVER == mode)

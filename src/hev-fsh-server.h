@@ -2,7 +2,7 @@
  ============================================================================
  Name        : hev-fsh-server.h
  Author      : hev <r@hev.cc>
- Copyright   : Copyright (c) 2017 - 2021 xyz
+ Copyright   : Copyright (c) 2017 - 2023 xyz
  Description : Fsh server
  ============================================================================
  */
@@ -14,6 +14,7 @@
 
 #include "hev-fsh-base.h"
 #include "hev-fsh-config.h"
+#include "hev-fsh-token-manager.h"
 #include "hev-fsh-session-manager.h"
 
 #ifdef __cplusplus
@@ -33,10 +34,13 @@ struct _HevFshServer
 
     int fd;
     int quit;
+    int pfds[2];
 
-    HevTask *task;
+    HevTask *main_task;
+    HevTask *event_task;
     HevFshConfig *config;
-    HevFshSessionManager *manager;
+    HevFshTokenManager *t_mgr;
+    HevFshSessionManager *s_mgr;
 };
 
 struct _HevFshServerClass

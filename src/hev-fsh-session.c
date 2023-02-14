@@ -2,7 +2,7 @@
  ============================================================================
  Name        : hev-fsh-session.c
  Author      : hev <r@hev.cc>
- Copyright   : Copyright (c) 2017 - 2021 xyz
+ Copyright   : Copyright (c) 2017 - 2023 xyz
  Description : Fsh session
  ============================================================================
  */
@@ -127,14 +127,22 @@ hev_fsh_session_login (HevFshSession *self, int msg_ver)
         }
     }
 
-    s = hev_fsh_session_manager_find (self->manager, TYPE_FORWARD,
-                                      &self->token);
+    if (self->t_mgr) {
+        res = hev_fsh_token_manager_find (self->t_mgr, &self->token);
+        if (!res) {
+            LOG_D ("%p fsh session reject", self);
+            sleep_wait (1500);
+            return -1;
+        }
+    }
+
+    s = hev_fsh_session_manager_find (self->s_mgr, TYPE_FORWARD, &self->token);
     if (s) {
         HevFshIO *io = HEV_FSH_IO (s);
 
         s->is_mgr = 0;
         s->type = TYPE_CLOSED;
-        hev_fsh_session_manager_remove (s->manager, s);
+        hev_fsh_session_manager_remove (s->s_mgr, s);
 
         io->timeout = 0;
         hev_task_wakeup (io->task);
@@ -149,7 +157,7 @@ hev_fsh_session_login (HevFshSession *self, int msg_ver)
     self->is_mgr = 1;
     self->type = TYPE_FORWARD;
     self->is_temp_token = (msg_ver == 3) ? 1 : 0;
-    hev_fsh_session_manager_insert (self->manager, self);
+    hev_fsh_session_manager_insert (self->s_mgr, self);
     hev_fsh_session_log (self, "L");
 
     return 0;
@@ -187,7 +195,7 @@ hev_fsh_session_connect (HevFshSession *self)
     if (res <= 0)
         return -1;
 
-    s = hev_fsh_session_manager_find (self->manager, TYPE_FORWARD, &mt.token);
+    s = hev_fsh_session_manager_find (self->s_mgr, TYPE_FORWARD, &mt.token);
     if (!s) {
         sleep_wait (1500);
         return -1;
@@ -204,7 +212,7 @@ hev_fsh_session_connect (HevFshSession *self)
     self->is_mgr = 1;
     self->type = TYPE_CONNECT;
     memcpy (self->token, mt.token, sizeof (HevFshToken));
-    hev_fsh_session_manager_insert (self->manager, self);
+    hev_fsh_session_manager_insert (self->s_mgr, self);
     hev_fsh_session_log (self, "C");
 
     hev_fsh_session_splice (self);
@@ -215,7 +223,7 @@ hev_fsh_session_connect (HevFshSession *self)
 static int
 hev_fsh_session_accept (HevFshSession *self)
 {
-    HevFshSessionManager *manager = self->manager;
+    HevFshSessionManager *manager = self->s_mgr;
     HevFshSession *s = NULL;
     HevFshMessageToken mt;
     unsigned timeout;
@@ -279,7 +287,7 @@ hev_fsh_session_close_session (HevFshSession *self)
         hev_fsh_session_log (self, "D");
 
     if (self->is_mgr)
-        hev_fsh_session_manager_remove (self->manager, self);
+        hev_fsh_session_manager_remove (self->s_mgr, self);
 
     hev_object_unref (HEV_OBJECT (self));
 }
@@ -336,8 +344,8 @@ hev_fsh_session_run (HevFshIO *base)
 }
 
 HevFshSession *
-hev_fsh_session_new (int fd, unsigned int timeout,
-                     HevFshSessionManager *manager)
+hev_fsh_session_new (int fd, unsigned int timeout, HevFshTokenManager *t_mgr,
+                     HevFshSessionManager *s_mgr)
 {
     HevFshSession *self;
     int res;
@@ -346,7 +354,7 @@ hev_fsh_session_new (int fd, unsigned int timeout,
     if (!self)
         return NULL;
 
-    res = hev_fsh_session_construct (self, fd, timeout, manager);
+    res = hev_fsh_session_construct (self, fd, timeout, t_mgr, s_mgr);
     if (res < 0) {
         hev_free (self);
         return NULL;
@@ -359,7 +367,8 @@ hev_fsh_session_new (int fd, unsigned int timeout,
 
 int
 hev_fsh_session_construct (HevFshSession *self, int fd, unsigned int timeout,
-                           HevFshSessionManager *manager)
+                           HevFshTokenManager *t_mgr,
+                           HevFshSessionManager *s_mgr)
 {
     int res;
 
@@ -373,7 +382,8 @@ hev_fsh_session_construct (HevFshSession *self, int fd, unsigned int timeout,
 
     self->client_fd = fd;
     self->remote_fd = -1;
-    self->manager = manager;
+    self->t_mgr = t_mgr;
+    self->s_mgr = s_mgr;
 
     return 0;
 }
