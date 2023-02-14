@@ -2,7 +2,7 @@
  ============================================================================
  Name        : hev-fsh-config.c
  Author      : hev <r@hev.cc>
- Copyright   : Copyright (c) 2018 - 2021 xyz
+ Copyright   : Copyright (c) 2018 - 2023 xyz
  Description : Fsh Config
  ============================================================================
  */
@@ -41,6 +41,7 @@ struct _HevFshConfig
     const char *user;
     const char *token;
     const char *log_path;
+    const char *tokens_file;
 
     HevFshAddrListNode *addr_list;
 
@@ -150,6 +151,18 @@ void
 hev_fsh_config_set_server_port (HevFshConfig *self, const char *val)
 {
     self->server_port = val;
+}
+
+const char *
+hev_fsh_config_get_tokens_file (HevFshConfig *self)
+{
+    return self->tokens_file;
+}
+
+void
+hev_fsh_config_set_tokens_file (HevFshConfig *self, const char *val)
+{
+    self->tokens_file = val;
 }
 
 const char *
