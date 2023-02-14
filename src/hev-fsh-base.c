@@ -2,7 +2,7 @@
  ============================================================================
  Name        : hev-fsh-base.c
  Author      : hev <r@hev.cc>
- Copyright   : Copyright (c) 2020 - 2021 xyz
+ Copyright   : Copyright (c) 2020 - 2023 xyz
  Description : Fsh base
  ============================================================================
  */
@@ -33,6 +33,16 @@ hev_fsh_base_stop (HevFshBase *self)
     LOG_D ("%p fsh base stop", self);
 
     klass->stop (self);
+}
+
+void
+hev_fsh_base_reload (HevFshBase *self)
+{
+    HevFshBaseClass *klass = HEV_OBJECT_GET_CLASS (self);
+
+    LOG_D ("%p fsh base reload", self);
+
+    klass->reload (self);
 }
 
 int

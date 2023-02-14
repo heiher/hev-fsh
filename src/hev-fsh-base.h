@@ -2,7 +2,7 @@
  ============================================================================
  Name        : hev-fsh-base.h
  Author      : hev <r@hev.cc>
- Copyright   : Copyright (c) 2020 - 2021 xyz
+ Copyright   : Copyright (c) 2020 - 2023 xyz
  Description : Fsh base
  ============================================================================
  */
@@ -34,6 +34,7 @@ struct _HevFshBaseClass
 
     void (*start) (HevFshBase *self);
     void (*stop) (HevFshBase *self);
+    void (*reload) (HevFshBase *self);
 };
 
 HevObjectClass *hev_fsh_base_class (void);
@@ -42,6 +43,7 @@ int hev_fsh_base_construct (HevFshBase *self);
 
 void hev_fsh_base_start (HevFshBase *self);
 void hev_fsh_base_stop (HevFshBase *self);
+void hev_fsh_base_reload (HevFshBase *self);
 
 #ifdef __cplusplus
 }
