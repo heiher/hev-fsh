@@ -2,7 +2,7 @@
  ============================================================================
  Name        : hev-fsh-client.c
  Author      : hev <r@hev.cc>
- Copyright   : Copyright (c) 2020 - 2021 xyz
+ Copyright   : Copyright (c) 2020 - 2023 xyz
  Description : Fsh client
  ============================================================================
  */
@@ -34,6 +34,12 @@ hev_fsh_client_stop (HevFshBase *base)
     LOG_D ("%p fsh clinet stop", base);
 
     exit (0);
+}
+
+void
+hev_fsh_client_reload (HevFshBase *base)
+{
+    LOG_D ("%p fsh clinet reload", base);
 }
 
 HevFshBase *
@@ -109,6 +115,7 @@ hev_fsh_client_class (void)
         bkptr = HEV_FSH_BASE_CLASS (kptr);
         bkptr->start = hev_fsh_client_start;
         bkptr->stop = hev_fsh_client_stop;
+        bkptr->reload = hev_fsh_client_reload;
     }
 
     return okptr;
