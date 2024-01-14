@@ -288,7 +288,7 @@ hev_fsh_client_forward_destruct (HevObject *base)
 
     LOG_D ("%p fsh client forward destruct", self);
 
-    HEV_FSH_CLIENT_BASE_TYPE->finalizer (base);
+    HEV_FSH_CLIENT_BASE_TYPE->destruct (base);
 }
 
 HevObjectClass *
@@ -304,7 +304,7 @@ hev_fsh_client_forward_class (void)
         memcpy (kptr, HEV_FSH_CLIENT_BASE_TYPE, sizeof (HevFshClientBaseClass));
 
         okptr->name = "HevFshClientForward";
-        okptr->finalizer = hev_fsh_client_forward_destruct;
+        okptr->destruct = hev_fsh_client_forward_destruct;
 
         ikptr = HEV_FSH_IO_CLASS (kptr);
         ikptr->run = hev_fsh_client_forward_run;

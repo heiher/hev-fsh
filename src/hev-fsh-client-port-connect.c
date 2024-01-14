@@ -151,7 +151,7 @@ hev_fsh_client_port_connect_destruct (HevObject *base)
     if (self->fd >= 0)
         close (self->fd);
 
-    HEV_FSH_CLIENT_CONNECT_TYPE->finalizer (base);
+    HEV_FSH_CLIENT_CONNECT_TYPE->destruct (base);
 }
 
 HevObjectClass *
@@ -169,7 +169,7 @@ hev_fsh_client_port_connect_class (void)
         memcpy (kptr, ptr, sizeof (HevFshClientConnectClass));
 
         okptr->name = "HevFshClientPortConnect";
-        okptr->finalizer = hev_fsh_client_port_connect_destruct;
+        okptr->destruct = hev_fsh_client_port_connect_destruct;
 
         ikptr = HEV_FSH_IO_CLASS (kptr);
         ikptr->run = hev_fsh_client_port_connect_run;

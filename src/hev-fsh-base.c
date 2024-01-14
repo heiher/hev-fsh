@@ -68,7 +68,7 @@ hev_fsh_base_destruct (HevObject *base)
 
     LOG_D ("%p fsh base destruct", self);
 
-    HEV_OBJECT_TYPE->finalizer (base);
+    HEV_OBJECT_TYPE->destruct (base);
     hev_free (base);
 }
 
@@ -83,7 +83,7 @@ hev_fsh_base_class (void)
         memcpy (kptr, HEV_OBJECT_TYPE, sizeof (HevObjectClass));
 
         okptr->name = "HevFshBase";
-        okptr->finalizer = hev_fsh_base_destruct;
+        okptr->destruct = hev_fsh_base_destruct;
     }
 
     return okptr;

@@ -120,7 +120,7 @@ hev_fsh_session_manager_destruct (HevObject *base)
 
     LOG_D ("%p fsh session manager destruct", self);
 
-    HEV_OBJECT_TYPE->finalizer (base);
+    HEV_OBJECT_TYPE->destruct (base);
     hev_free (self);
 }
 
@@ -135,7 +135,7 @@ hev_fsh_session_manager_class (void)
         memcpy (kptr, HEV_OBJECT_TYPE, sizeof (HevObjectClass));
 
         okptr->name = "HevFshSessionManager";
-        okptr->finalizer = hev_fsh_session_manager_destruct;
+        okptr->destruct = hev_fsh_session_manager_destruct;
     }
 
     return okptr;

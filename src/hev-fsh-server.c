@@ -244,7 +244,7 @@ hev_fsh_server_destruct (HevObject *base)
     hev_task_unref (self->main_task);
     close (self->fd);
 
-    HEV_FSH_BASE_TYPE->finalizer (base);
+    HEV_FSH_BASE_TYPE->destruct (base);
 }
 
 HevObjectClass *
@@ -260,7 +260,7 @@ hev_fsh_server_class (void)
         memcpy (kptr, HEV_FSH_BASE_TYPE, sizeof (HevFshBaseClass));
 
         okptr->name = "HevFshServer";
-        okptr->finalizer = hev_fsh_server_destruct;
+        okptr->destruct = hev_fsh_server_destruct;
 
         bkptr = HEV_FSH_BASE_CLASS (kptr);
         bkptr->start = hev_fsh_server_start;

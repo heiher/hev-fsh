@@ -94,7 +94,7 @@ hev_fsh_client_destruct (HevObject *base)
 
     hev_object_unref (HEV_OBJECT (self->factory));
 
-    HEV_FSH_BASE_TYPE->finalizer (base);
+    HEV_FSH_BASE_TYPE->destruct (base);
 }
 
 HevObjectClass *
@@ -110,7 +110,7 @@ hev_fsh_client_class (void)
         memcpy (kptr, HEV_FSH_BASE_TYPE, sizeof (HevFshBaseClass));
 
         okptr->name = "HevFshClient";
-        okptr->finalizer = hev_fsh_client_destruct;
+        okptr->destruct = hev_fsh_client_destruct;
 
         bkptr = HEV_FSH_BASE_CLASS (kptr);
         bkptr->start = hev_fsh_client_start;

@@ -400,7 +400,7 @@ hev_fsh_session_destruct (HevObject *base)
     if (self->client_fd >= 0)
         close (self->client_fd);
 
-    HEV_FSH_IO_TYPE->finalizer (base);
+    HEV_FSH_IO_TYPE->destruct (base);
 }
 
 HevObjectClass *
@@ -416,7 +416,7 @@ hev_fsh_session_class (void)
         memcpy (kptr, HEV_FSH_IO_TYPE, sizeof (HevFshIOClass));
 
         okptr->name = "HevFshSession";
-        okptr->finalizer = hev_fsh_session_destruct;
+        okptr->destruct = hev_fsh_session_destruct;
 
         ikptr = HEV_FSH_IO_CLASS (kptr);
         ikptr->run = hev_fsh_session_run;

@@ -85,7 +85,7 @@ hev_fsh_client_accept_destruct (HevObject *base)
 
     LOG_D ("%p fsh client accept destruct", self);
 
-    HEV_FSH_CLIENT_BASE_TYPE->finalizer (base);
+    HEV_FSH_CLIENT_BASE_TYPE->destruct (base);
 }
 
 HevObjectClass *
@@ -99,7 +99,7 @@ hev_fsh_client_accept_class (void)
         memcpy (kptr, HEV_FSH_CLIENT_BASE_TYPE, sizeof (HevFshClientBaseClass));
 
         okptr->name = "HevFshClientAccept";
-        okptr->finalizer = hev_fsh_client_accept_destruct;
+        okptr->destruct = hev_fsh_client_accept_destruct;
     }
 
     return okptr;

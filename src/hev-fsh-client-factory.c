@@ -92,7 +92,7 @@ hev_fsh_client_factory_destruct (HevObject *base)
 
     LOG_D ("%p fsh client factory destruct", self);
 
-    HEV_OBJECT_TYPE->finalizer (base);
+    HEV_OBJECT_TYPE->destruct (base);
     hev_free (self);
 }
 
@@ -107,7 +107,7 @@ hev_fsh_client_factory_class (void)
         memcpy (kptr, HEV_OBJECT_TYPE, sizeof (HevObjectClass));
 
         okptr->name = "HevFshClientFactory";
-        okptr->finalizer = hev_fsh_client_factory_destruct;
+        okptr->destruct = hev_fsh_client_factory_destruct;
     }
 
     return okptr;

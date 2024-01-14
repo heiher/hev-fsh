@@ -78,7 +78,7 @@ hev_fsh_client_sock_listen_destruct (HevObject *base)
 
     LOG_D ("%p fsh client sock listen destruct", self);
 
-    HEV_FSH_CLIENT_LISTEN_TYPE->finalizer (base);
+    HEV_FSH_CLIENT_LISTEN_TYPE->destruct (base);
 }
 
 HevObjectClass *
@@ -96,7 +96,7 @@ hev_fsh_client_sock_listen_class (void)
         memcpy (kptr, ptr, sizeof (HevFshClientListenClass));
 
         okptr->name = "HevFshClientSockListen";
-        okptr->finalizer = hev_fsh_client_sock_listen_destruct;
+        okptr->destruct = hev_fsh_client_sock_listen_destruct;
 
         ckptr = HEV_FSH_CLIENT_LISTEN_CLASS (kptr);
         ckptr->dispatch = hev_fsh_client_sock_listen_dispatch;

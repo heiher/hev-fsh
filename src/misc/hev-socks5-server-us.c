@@ -87,7 +87,7 @@ hev_socks5_server_us_destruct (HevObject *base)
 
     LOG_D ("%p socks5 server us destruct", self);
 
-    HEV_SOCKS5_SERVER_TYPE->finalizer (base);
+    HEV_SOCKS5_SERVER_TYPE->destruct (base);
 }
 
 HevObjectClass *
@@ -102,7 +102,7 @@ hev_socks5_server_us_class (void)
         memcpy (kptr, HEV_SOCKS5_SERVER_TYPE, sizeof (HevSocks5ServerClass));
 
         okptr->name = "HevSocks5ServerUS";
-        okptr->finalizer = hev_socks5_server_us_destruct;
+        okptr->destruct = hev_socks5_server_us_destruct;
 
         tiptr = &kptr->base.tcp;
         tiptr->splicer = hev_socks5_server_us_tcp_splicer;

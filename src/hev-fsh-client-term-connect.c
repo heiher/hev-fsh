@@ -139,7 +139,7 @@ hev_fsh_client_term_connect_destruct (HevObject *base)
 
     LOG_D ("%p fsh client term connect destruct", self);
 
-    HEV_FSH_CLIENT_CONNECT_TYPE->finalizer (base);
+    HEV_FSH_CLIENT_CONNECT_TYPE->destruct (base);
 }
 
 HevObjectClass *
@@ -157,7 +157,7 @@ hev_fsh_client_term_connect_class (void)
         memcpy (kptr, ptr, sizeof (HevFshClientConnectClass));
 
         okptr->name = "HevFshClientTermConnect";
-        okptr->finalizer = hev_fsh_client_term_connect_destruct;
+        okptr->destruct = hev_fsh_client_term_connect_destruct;
 
         ikptr = HEV_FSH_IO_CLASS (kptr);
         ikptr->run = hev_fsh_client_term_connect_run;

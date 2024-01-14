@@ -27,7 +27,7 @@ extern "C" {
 #define EXPORT_SYMBOL __attribute__ ((visibility ("default")))
 #endif
 
-#define barrier() __asm__ __volatile__("" : : : "memory")
+#define barrier() __asm__ __volatile__ ("" : : : "memory")
 
 static inline void
 __read_once_size (void *dst, const volatile void *src, int size)
