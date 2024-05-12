@@ -1,7 +1,5 @@
 # HevFsh
 
-[![status](https://gitlab.com/hev/hev-fsh/badges/master/pipeline.svg)](https://gitlab.com/hev/hev-fsh/commits/master)
-
 Fsh is to help you access local Shell and TCP services behind NAT or firewall.
 
 **Features**
