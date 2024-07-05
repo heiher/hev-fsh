@@ -10,6 +10,8 @@
 #ifndef __HEV_FSH_PROTOCOL_H__
 #define __HEV_FSH_PROTOCOL_H__
 
+#define HEV_FSH_TOKEN_STR_LEN 36
+
 typedef enum _HevFshCommand HevFshCommand;
 typedef struct _HevFshMessage HevFshMessage;
 typedef struct _HevFshMessageToken HevFshMessageToken;

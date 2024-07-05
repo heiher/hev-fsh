@@ -106,17 +106,17 @@ hev_fsh_protocol_token_from_string (HevFshToken token, const char *str)
     char buf[3];
     int i;
 
-    if (strlen (str) != 36)
+    if (strlen (str) != HEV_FSH_TOKEN_STR_LEN)
         return -1;
 
-    for (i = 0, cp = str; i <= 36; i++, cp++) {
+    for (i = 0, cp = str; i <= HEV_FSH_TOKEN_STR_LEN; i++, cp++) {
         if ((i == 8) || (i == 13) || (i == 18) || (i == 23)) {
             if (*cp == '-')
                 continue;
             else
                 return -1;
         }
-        if (i == 36) {
+        if (i == HEV_FSH_TOKEN_STR_LEN) {
             if (*cp == 0)
                 continue;
         }
