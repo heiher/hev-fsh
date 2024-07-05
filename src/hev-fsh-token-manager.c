@@ -120,6 +120,9 @@ hev_fsh_token_manager_reload (HevFshTokenManager *self)
         int res;
 
         line[n - 1] = '\0';
+        if (strlen (line) > HEV_FSH_TOKEN_STR_LEN)
+            line[HEV_FSH_TOKEN_STR_LEN] = '\0';
+
         res = hev_fsh_protocol_token_from_string (token, line);
         if (res < 0) {
             LOG_E ("%p fsh token manager parse: %s", self, line);
