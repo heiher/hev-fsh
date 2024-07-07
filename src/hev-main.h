@@ -2,7 +2,7 @@
  ============================================================================
  Name        : hev-main.h
  Author      : hev <r@hev.cc>
- Copyright   : Copyright (c) 2017 - 2023 xyz
+ Copyright   : Copyright (c) 2017 - 2024 xyz
  Description : Main
  ============================================================================
  */
@@ -12,6 +12,6 @@
 
 #define MAJOR_VERSION (4)
 #define MINOR_VERSION (8)
-#define MICRO_VERSION (4)
+#define MICRO_VERSION (5)
 
 #endif /* __HEV_MAIN_H__ */
