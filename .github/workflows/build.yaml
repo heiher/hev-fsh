@@ -8,6 +8,7 @@ on:
   release:
     types:
       - published
+  workflow_dispatch:
 
 jobs:
   linux:
@@ -80,16 +81,40 @@ jobs:
           wget https://github.com/musl-cross/musl-cross/releases/download/20241103/${{ matrix.tool }}.tar.xz
           sudo tar xf ${{ matrix.tool }}.tar.xz -C /opt/x-tools
           make CROSS_PREFIX=/opt/x-tools/${{ matrix.tool }}/bin/${{ matrix.tool }}- CFLAGS=${{ matrix.env.CFLAGS }} ENABLE_STATIC=1 -j`nproc`
+          cp bin/hev-fsh fsh-linux-${{ matrix.name }}
       - name: Upload ${{ matrix.name }}
-        if: github.event_name == 'release'
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        uses: actions/upload-artifact@v4
         with:
-          upload_url: ${{ github.event.release.upload_url }}
-          asset_path: bin/hev-fsh
-          asset_name: fsh-linux-${{ matrix.name }}
-          asset_content_type: application/octet-stream
+          name: fsh-linux-${{ matrix.name }}
+          path: fsh-linux-${{ matrix.name }}
+          if-no-files-found: error
+          retention-days: 1
+
+  release:
+    name: Release
+    runs-on: ubuntu-22.04
+    needs:
+      - linux
+    if: github.event_name == 'release'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release
+          pattern: "fsh-*"
+          merge-multiple: true
+      - name: Upload artifacts
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          for i in release/fsh-*; do
+            gh release upload ${{ github.event.release.tag_name }} $i
+          done
+
   macos:
     name: macOS
     runs-on: macos-14
@@ -103,6 +128,7 @@ jobs:
       - name: Build
         run: |
           make
+
   llvm:
     name: LLVM
     runs-on: ubuntu-22.04
