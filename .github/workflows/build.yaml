@@ -11,6 +11,30 @@ on:
   workflow_dispatch:
 
 jobs:
+  source:
+    name: Source
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          submodules: true
+      - name: Gen Source
+        run: |
+          REV_ID=$(git rev-parse --short HEAD)
+          mkdir -p fsh-${{ github.ref_name }}
+          git ls-files --recurse-submodules | tar c -O -T- | tar x -C fsh-${{ github.ref_name }}
+          echo ${REV_ID} > fsh-${{ github.ref_name }}/.rev-id
+          tar cJf fsh-${{ github.ref_name }}.tar.xz fsh-${{ github.ref_name }}
+      - name: Upload source
+        uses: actions/upload-artifact@v4
+        with:
+          name: fsh-${{ github.ref_name }}.tar.xz
+          path: fsh-${{ github.ref_name }}.tar.xz
+          if-no-files-found: error
+          retention-days: 1
+
   linux:
     name: Linux
     runs-on: ubuntu-22.04
@@ -94,6 +118,7 @@ jobs:
     name: Release
     runs-on: ubuntu-22.04
     needs:
+      - source
       - linux
     if: github.event_name == 'release'
     steps:
