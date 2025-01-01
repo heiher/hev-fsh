@@ -2,12 +2,12 @@
 
 [![status](https://github.com/heiher/hev-fsh/actions/workflows/build.yaml/badge.svg?branch=master&event=push)](https://github.com/heiher/hev-fsh)
 
-Fsh is to help you access local Shell and TCP services behind NAT or firewall.
+Fsh helps you access local shell and TCP services behind a NAT or firewall.
 
 **Features**
-* Shell.
-* TCP Port.
-* Socks v5.
+* Remote shell.
+* TCP port forwarding.
+* SOCKS5 service.
 * IPv4/IPv6. (dual stack)
 * End-to-end encryption. (Linux only, it depends on kernel TLS)
 
@@ -30,7 +30,7 @@ Fsh is to help you access local Shell and TCP services behind NAT or firewall.
            v                    v
     +-------------+      +-------------+
     | Forwarder A |      | Forwarder B |
-    |   (TCP)     |      |    (Term)   |
+    |   (TCP)     |      |   (Shell)   |
     +-------------+      +-------------+
            ^
            |
@@ -42,6 +42,7 @@ Fsh is to help you access local Shell and TCP services behind NAT or firewall.
 ```
 
 ## How to Build
+
 ```bash
 git clone --recursive git://github.com/heiher/hev-fsh
 cd hev-fsh
@@ -187,7 +188,9 @@ HevObject +-> HevFshBase +-> HevFshServer
 ```
 
 ## Contributors
+
 * **hev** - https://hev.cc
 
 ## License
+
 MIT
