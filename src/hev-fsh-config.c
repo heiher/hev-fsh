@@ -238,17 +238,7 @@ static int
 is_ugly_ktls (void)
 {
 #ifdef __linux__
-    struct utsname u;
-    int res;
-
-    res = uname (&u);
-    if (res < 0)
-        return 1;
-
-    /* The kernel TLS with splice syscall is not working before v5.14. */
-    res = hev_strverscmp (u.release, "5.14");
-    if (res < 0)
-        return 1;
+    return 1;
 #endif
 
     return 0;
