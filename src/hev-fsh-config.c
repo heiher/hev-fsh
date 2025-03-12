@@ -18,7 +18,6 @@
 
 #include <hev-task-dns.h>
 #include <hev-task-call.h>
-#include <hev-strverscmp.h>
 
 #include "hev-fsh-config.h"
 #include "hev-memory-allocator.h"
