@@ -71,6 +71,8 @@ task_io_splice (HevTaskIOSplicer *self, int fd_in, int fd_out)
             res = 1;
             hev_circular_buffer_read_finish (self->buf, s);
         }
+    } else if (res < 0) {
+        shutdown (fd_out, SHUT_WR);
     }
 
     return res;
