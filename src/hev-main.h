@@ -11,7 +11,7 @@
 #define __HEV_MAIN_H__
 
 #define MAJOR_VERSION (4)
-#define MINOR_VERSION (9)
+#define MINOR_VERSION (10)
 #define MICRO_VERSION (0)
 
 #endif /* __HEV_MAIN_H__ */
