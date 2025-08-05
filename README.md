@@ -163,6 +163,23 @@ fsh -p 2200:[::1]:22 127.0.0.1/8b9bf4e7-b2b2-4115-ac97-0c7f69433bc4
 fsh -p [::1]:2200:[::1]:22 127.0.0.1/8b9bf4e7-b2b2-4115-ac97-0c7f69433bc4
 ```
 
+### OpenWrt 24.10+
+
+Repo: https://github.com/openwrt/packages/tree/master/net/fsh
+
+```sh
+# Install package
+opkg install fsh
+
+# Edit /etc/config/fsh
+
+# Restart server
+/etc/init.d/fshs restart
+
+# Restart client
+/etc/init.d/fshc restart
+```
+
 ## Classes
 
 ```
