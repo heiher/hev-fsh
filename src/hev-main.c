@@ -32,7 +32,8 @@ static void
 show_help (void)
 {
     fprintf (stderr,
-             "Common: [-4 | -6] [-k KEY] [-t TIMEOUT] [-l LOG] [-v]\n"
+             "Common: [-4 | -6] [-k KEY] [-t TIMEOUT] [-l LOG] "
+             "[-c TCP_CONGESTION] [-v]\n"
              "Server: -s [SERVER_ADDR:SERVER_PORT] [-a TOKENS_FILE]\n"
              "Terminal:\n"
              "  Forwarder: -f [-u USER] SERVER_ADDR[:SERVER_PORT/TOKEN]\n"
@@ -433,7 +434,7 @@ parse_args (HevFshConfig *config, int argc, char *argv[])
     const char *t1 = NULL;
     const char *t2 = NULL;
 
-    while ((opt = getopt (argc, argv, "46k:t:vsfpxl:u:w:b:a:")) != -1) {
+    while ((opt = getopt (argc, argv, "46k:t:vsfpxl:u:w:b:a:c:")) != -1) {
         switch (opt) {
         case '4':
             hev_fsh_config_set_ip_type (config, 4);
@@ -476,6 +477,9 @@ parse_args (HevFshConfig *config, int argc, char *argv[])
             break;
         case 'a':
             hev_fsh_config_set_tokens_file (config, optarg);
+            break;
+        case 'c':
+            hev_fsh_config_set_tcp_cc (config, optarg);
             break;
         default:
             return -1;

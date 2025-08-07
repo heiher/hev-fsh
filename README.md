@@ -128,7 +128,7 @@ fsh -s -a tokens-allow-list
 
 **Common**:
 ```bash
-fsh [-4 | -6] [-k KEY] [-t TIMEOUT] [-l LOG] [-v]
+fsh [-4 | -6] [-k KEY] [-t TIMEOUT] [-l LOG] [-c TCP_CONGESTION] [-v]
 
 # Resolve names to IPv4 addresses only
 fsh -4
@@ -145,6 +145,9 @@ fsh -t 1000
 
 # Log to file
 fsh -l /var/log/fsh.log
+
+# TCP congestion control
+fsh -c bbr
 
 # Log verbose
 fsh -v

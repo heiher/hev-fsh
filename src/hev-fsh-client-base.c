@@ -116,6 +116,7 @@ hev_fsh_client_base_connect (HevFshClientBase *self)
 {
     struct sockaddr *addr;
     socklen_t addr_len;
+    const char *cc;
     int res;
     int fd;
 
@@ -128,6 +129,15 @@ hev_fsh_client_base_connect (HevFshClientBase *self)
     fd = hev_fsh_client_base_socket (self, addr->sa_family);
     if (fd < 0)
         return -1;
+
+    cc = hev_fsh_config_get_tcp_cc (self->config);
+    if (cc) {
+#ifdef __linux__
+        res = setsockopt (fd, IPPROTO_TCP, TCP_CONGESTION, cc, strlen (cc));
+        if (res < 0)
+            LOG_W ("%p fsh client base tcp congestion", self);
+#endif
+    }
 
     hev_task_add_fd (hev_task_self (), fd, POLLIN | POLLOUT);
 
