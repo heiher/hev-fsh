@@ -39,6 +39,7 @@ struct _HevFshConfig
 
     const char *user;
     const char *token;
+    const char *tcp_cc;
     const char *log_path;
     const char *tokens_file;
 
@@ -254,6 +255,18 @@ hev_fsh_config_set_key (HevFshConfig *self, HevFshConfigKey *val)
         self->crypto = 0;
         self->ugly_ktls = 0;
     }
+}
+
+const char *
+hev_fsh_config_get_tcp_cc (HevFshConfig *self)
+{
+    return self->tcp_cc;
+}
+
+void
+hev_fsh_config_set_tcp_cc (HevFshConfig *self, const char *val)
+{
+    self->tcp_cc = val;
 }
 
 const char *

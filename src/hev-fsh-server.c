@@ -10,6 +10,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <netinet/tcp.h>
 
 #include <hev-task.h>
 #include <hev-task-io.h>
@@ -33,12 +34,23 @@ hev_fsh_server_task_entry (void *data)
 
     for (;;) {
         HevFshSession *s;
+        const char *cc;
         int fd;
 
         fd = hev_task_io_socket_accept (self->fd, NULL, NULL, NULL, NULL);
         if (fd < 0) {
             LOG_W ("%p fsh server accept", self);
             continue;
+        }
+
+        cc = hev_fsh_config_get_tcp_cc (self->config);
+        if (cc) {
+#ifdef __linux__
+            int res;
+            res = setsockopt (fd, IPPROTO_TCP, TCP_CONGESTION, cc, strlen (cc));
+            if (res < 0)
+                LOG_W ("%p fsh server tcp congestion", self);
+#endif
         }
 
         s = hev_fsh_session_new (fd, timeout, self->t_mgr, self->s_mgr);
