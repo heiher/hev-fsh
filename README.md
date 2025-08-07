@@ -1,6 +1,6 @@
 # HevFsh
 
-[![status](https://github.com/heiher/hev-fsh/actions/workflows/build.yaml/badge.svg?branch=master&event=push)](https://github.com/heiher/hev-fsh)
+[![status](https://github.com/heiher/hev-fsh/actions/workflows/build.yaml/badge.svg?branch=main&event=push)](https://github.com/heiher/hev-fsh)
 
 Fsh helps you access local shell and TCP services behind a NAT or firewall.
 
