@@ -17,6 +17,7 @@
 #include <sys/socket.h>
 #include <sys/resource.h>
 
+#include <hev-socks5-misc.h>
 #include <hev-task-system.h>
 
 #include "hev-logger.h"
@@ -543,9 +544,10 @@ int
 main (int argc, char *argv[])
 {
     HevFshConfig *config = NULL;
-    int mode;
-    int level;
     const char *path;
+    int timeout;
+    int level;
+    int mode;
 
     if (hev_task_system_init () < 0)
         return -1;
@@ -564,9 +566,15 @@ main (int argc, char *argv[])
     mode = hev_fsh_config_get_mode (config);
     path = hev_fsh_config_get_log_path (config);
     level = hev_fsh_config_get_log_level (config);
+    timeout = hev_fsh_config_get_timeout (config);
+    timeout *= 1000;
 
     if (hev_logger_init (level, path) < 0)
         return -1;
+
+    hev_socks5_set_connect_timeout (timeout);
+    hev_socks5_set_tcp_timeout (timeout);
+    hev_socks5_set_udp_timeout (timeout);
 
     if (signal (SIGPIPE, SIG_IGN) == SIG_ERR)
         return -1;
