@@ -191,7 +191,7 @@ hev_fsh_client_base_encrypt (HevFshClientBase *self)
 
     res = hev_task_io_socket_recv (self->fd, ci.iv, sizeof (ci.iv), MSG_WAITALL,
                                    io_yielder, self);
-    if (res <= 0)
+    if (res != sizeof (ci.iv))
         return -1;
 
     res = setsockopt (self->fd, SOL_TLS, TLS_RX, &ci, sizeof (ci));

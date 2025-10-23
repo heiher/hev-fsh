@@ -129,7 +129,7 @@ hev_fsh_client_term_accept_task_entry (void *data)
     /* recv msg term info */
     res = hev_task_io_socket_recv (sfd, &mtinfo, sizeof (mtinfo), MSG_WAITALL,
                                    io_yielder, self);
-    if (res <= 0)
+    if (res != sizeof (mtinfo))
         goto quit;
 
     call = hev_task_call_new (sizeof (HevTaskCallForkPty), 16384);

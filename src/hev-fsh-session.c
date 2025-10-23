@@ -117,7 +117,7 @@ hev_fsh_session_login (HevFshSession *self, int msg_ver)
 
         res = hev_task_io_socket_recv (self->client_fd, &mt, sizeof (mt),
                                        MSG_WAITALL, io_yielder, self);
-        if (res <= 0)
+        if (res != sizeof (mt))
             return -1;
 
         if (memcmp (zt, mt.token, sizeof (HevFshToken)) == 0) {
@@ -192,7 +192,7 @@ hev_fsh_session_connect (HevFshSession *self)
 
     res = hev_task_io_socket_recv (self->client_fd, &mt, sizeof (mt),
                                    MSG_WAITALL, io_yielder, self);
-    if (res <= 0)
+    if (res != sizeof (mt))
         return -1;
 
     s = hev_fsh_session_manager_find (self->s_mgr, TYPE_FORWARD, &mt.token);
@@ -231,7 +231,7 @@ hev_fsh_session_accept (HevFshSession *self)
 
     res = hev_task_io_socket_recv (self->client_fd, &mt, sizeof (mt),
                                    MSG_WAITALL, io_yielder, self);
-    if (res <= 0)
+    if (res != sizeof (mt))
         return -1;
 
     /* wait for connect */
@@ -306,7 +306,7 @@ hev_fsh_session_task_entry (void *data)
         res = hev_task_io_socket_recv (self->client_fd, &msg, sizeof (msg),
                                        MSG_WAITALL, io_yielder, self);
 
-        if (res < 0) {
+        if (res != sizeof (msg)) {
             hev_fsh_session_close_session (self);
             break;
         }

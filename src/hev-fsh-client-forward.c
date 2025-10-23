@@ -75,7 +75,7 @@ hev_fsh_client_forward_read_token (HevFshClientForward *self)
 
     res = hev_task_io_socket_recv (self->base.fd, &msg, sizeof (msg),
                                    MSG_WAITALL, io_yielder, self);
-    if (res <= 0)
+    if (res != sizeof (msg))
         return -1;
 
     if (msg.cmd != HEV_FSH_CMD_TOKEN) {
@@ -85,7 +85,7 @@ hev_fsh_client_forward_read_token (HevFshClientForward *self)
 
     res = hev_task_io_socket_recv (self->base.fd, &token, sizeof (token),
                                    MSG_WAITALL, io_yielder, self);
-    if (res <= 0)
+    if (res != sizeof (token))
         return -1;
 
     hev_fsh_protocol_token_to_string (token.token, buf);
@@ -163,7 +163,7 @@ hev_fsh_client_forward_dispatch (HevFshClientForward *self)
 
         res = hev_task_io_socket_recv (base->fd, &msg, sizeof (msg),
                                        MSG_WAITALL, io_yielder, self);
-        if (res <= 0)
+        if (res != sizeof (msg))
             return;
 
         switch (msg.cmd) {
@@ -177,7 +177,7 @@ hev_fsh_client_forward_dispatch (HevFshClientForward *self)
 
         res = hev_task_io_socket_recv (base->fd, &token, sizeof (token),
                                        MSG_WAITALL, io_yielder, self);
-        if (res <= 0)
+        if (res != sizeof (token))
             return;
 
         hev_fsh_client_forward_accept (self, token.token);

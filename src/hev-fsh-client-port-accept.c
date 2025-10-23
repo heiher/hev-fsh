@@ -40,7 +40,7 @@ hev_fsh_client_port_accept_task_entry (void *data)
     /* recv message port info */
     res = hev_task_io_socket_recv (rfd, &mpinfo, sizeof (mpinfo), MSG_WAITALL,
                                    io_yielder, self);
-    if (res <= 0)
+    if (res != sizeof (mpinfo))
         goto quit;
 
     res = hev_fsh_config_addr_list_contains (base->config, mpinfo.type,
