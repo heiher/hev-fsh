@@ -70,7 +70,8 @@ unsigned int hev_fsh_config_get_timeout (HevFshConfig *self);
 void hev_fsh_config_set_timeout (HevFshConfig *self, unsigned int val);
 
 HevFshConfigKey *hev_fsh_config_get_key (HevFshConfig *self);
-void hev_fsh_config_set_key (HevFshConfig *self, HevFshConfigKey *val);
+void hev_fsh_config_set_key (HevFshConfig *self, HevFshConfigKey *val,
+                             int ugly_ktls);
 
 const char *hev_fsh_config_get_tcp_cc (HevFshConfig *self);
 void hev_fsh_config_set_tcp_cc (HevFshConfig *self, const char *val);

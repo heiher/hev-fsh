@@ -34,7 +34,7 @@ show_help (void)
 {
     fprintf (stderr,
              "Common: [-4 | -6] [-k KEY] [-t TIMEOUT] [-l LOG] "
-             "[-c TCP_CONGESTION] [-v]\n"
+             "[-c TCP_CONGESTION] [-v] [-U]\n"
              "Server: -s [SERVER_ADDR:SERVER_PORT] [-a TOKENS_FILE]\n"
              "Terminal:\n"
              "  Forwarder: -f [-u USER] SERVER_ADDR[:SERVER_PORT/TOKEN]\n"
@@ -392,7 +392,7 @@ parse_client (HevFshConfig *config, int f, int p, int x, const char *t1,
 }
 
 static int
-parse_key (HevFshConfig *config, const char *key)
+parse_key (HevFshConfig *config, const char *key, int ugly_ktls)
 {
 #ifdef __linux__
     HevFshConfigKey k;
@@ -409,7 +409,7 @@ parse_key (HevFshConfig *config, const char *key)
         return -1;
     }
 
-    hev_fsh_config_set_key (config, &k);
+    hev_fsh_config_set_key (config, &k, ugly_ktls);
     close (fd);
 
     return 0;
@@ -427,6 +427,7 @@ parse_args (HevFshConfig *config, int argc, char *argv[])
     int f = 0;
     int p = 0;
     int x = 0;
+    int U = 0;
     const char *k = NULL;
     const char *l = NULL;
     const char *u = NULL;
@@ -482,6 +483,9 @@ parse_args (HevFshConfig *config, int argc, char *argv[])
         case 'c':
             hev_fsh_config_set_tcp_cc (config, optarg);
             break;
+        case 'U':
+            U = 1;
+            break;
         default:
             return -1;
         }
@@ -501,7 +505,7 @@ parse_args (HevFshConfig *config, int argc, char *argv[])
     }
 
     if (k) {
-        if (parse_key (config, k) < 0)
+        if (parse_key (config, k, U) < 0)
             return -1;
     }
 

@@ -234,22 +234,12 @@ hev_fsh_config_get_key (HevFshConfig *self)
     return NULL;
 }
 
-static int
-is_ugly_ktls (void)
-{
-#ifdef __linux__
-    return 1;
-#endif
-
-    return 0;
-}
-
 void
-hev_fsh_config_set_key (HevFshConfig *self, HevFshConfigKey *val)
+hev_fsh_config_set_key (HevFshConfig *self, HevFshConfigKey *val, int ugly_ktls)
 {
     if (val) {
         self->crypto = 1;
-        self->ugly_ktls = is_ugly_ktls ();
+        self->ugly_ktls = ugly_ktls;
         memcpy (&self->key, val, sizeof (self->key));
     } else {
         self->crypto = 0;

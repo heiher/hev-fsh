@@ -151,6 +151,9 @@ fsh -c bbr
 
 # Log verbose
 fsh -v
+
+# Ugly kTLS workaround for kTLS + splice on older Linux kernels
+fsh -U
 ```
 
 **IPv6**:
