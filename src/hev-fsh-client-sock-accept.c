@@ -8,8 +8,8 @@
  */
 
 #include <string.h>
-#include <unistd.h>
 
+#include <hev-sys.h>
 #include <hev-task.h>
 #include <hev-task-io.h>
 #include <hev-task-io-socket.h>
@@ -39,6 +39,9 @@ hev_fsh_client_sock_accept_task_entry (void *data)
         socks = hev_socks5_server_new (base->fd);
     if (!socks)
         goto quit;
+
+    /* The socks5 server owns the socket now. */
+    base->fd = -1;
 
     hev_socks5_server_run (socks);
     hev_object_unref (HEV_OBJECT (socks));

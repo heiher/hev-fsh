@@ -9,14 +9,17 @@
 
 #include <fcntl.h>
 #include <string.h>
-#include <unistd.h>
-#include <arpa/inet.h>
 
+#include <hev-sys.h>
+#ifdef _WIN32
+#include <windows.h>
+#endif
 #include <hev-task.h>
 #include <hev-task-io.h>
 #include <hev-task-io-socket.h>
 #include <hev-memory-allocator.h>
 
+#include "hev-bridge.h"
 #include "hev-logger.h"
 #include "hev-task-io-us.h"
 #include "hev-fsh-protocol.h"
@@ -32,6 +35,7 @@ hev_fsh_client_port_connect_task_entry (void *data)
     HevTask *task = hev_task_self ();
     const char *addr;
     int port;
+    int sfd = -1;
     int ifd;
     int ofd;
     int bfd;
@@ -61,22 +65,31 @@ hev_fsh_client_port_connect_task_entry (void *data)
     if (res <= 0)
         goto exit;
 
+    ifd = self->fd;
+    ofd = self->fd;
     if (self->fd < 0) {
+#ifdef _WIN32
+        /* The standard handles are not pollable, move data via threads. */
+        sfd = hev_bridge_new (GetStdHandle (STD_INPUT_HANDLE),
+                              GetStdHandle (STD_OUTPUT_HANDLE), 0);
+        if (sfd < 0)
+            goto exit;
+        ifd = sfd;
+        ofd = sfd;
+#else
         ifd = 0;
         ofd = 1;
-    } else {
-        ifd = self->fd;
-        ofd = self->fd;
+#endif
     }
 
-    res = fcntl (ifd, F_SETFL, O_NONBLOCK);
+    res = hev_task_io_fcntl (ifd, F_SETFL, O_NONBLOCK);
     if (res < 0)
-        goto exit;
+        goto exit_close;
 
     if (ifd != ofd) {
-        res = fcntl (ofd, F_SETFL, O_NONBLOCK);
+        res = hev_task_io_fcntl (ofd, F_SETFL, O_NONBLOCK);
         if (res < 0)
-            goto exit;
+            goto exit_close;
 
         hev_task_add_fd (task, ifd, POLLIN);
         hev_task_add_fd (task, ofd, POLLOUT);
@@ -89,6 +102,9 @@ hev_fsh_client_port_connect_task_entry (void *data)
     else
         hev_task_io_splice (bfd, bfd, ifd, ofd, 8192, io_yielder, self);
 
+exit_close:
+    if (sfd >= 0)
+        hev_task_io_close (sfd);
 exit:
     hev_object_unref (HEV_OBJECT (self));
 }
@@ -149,7 +165,7 @@ hev_fsh_client_port_connect_destruct (HevObject *base)
     LOG_D ("%p fsh client port connect destruct", self);
 
     if (self->fd >= 0)
-        close (self->fd);
+        hev_task_io_close (self->fd);
 
     HEV_FSH_CLIENT_CONNECT_TYPE->destruct (base);
 }

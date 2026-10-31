@@ -13,6 +13,7 @@
 
 #include <hev-memory-allocator.h>
 
+#include "hev-compat.h"
 #include "hev-logger.h"
 #include "hev-compiler.h"
 

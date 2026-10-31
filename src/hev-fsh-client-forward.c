@@ -8,8 +8,8 @@
  */
 
 #include <string.h>
-#include <unistd.h>
 
+#include <hev-sys.h>
 #include <hev-task.h>
 #include <hev-task-io.h>
 #include <hev-task-io-socket.h>
@@ -210,7 +210,7 @@ hev_fsh_client_forward_task_entry (void *data)
         hev_fsh_client_forward_dispatch (self);
 
     restart:
-        close (base->fd);
+        hev_task_io_close (base->fd);
         hev_task_sleep (1000);
     }
 }

@@ -116,12 +116,108 @@ jobs:
           if-no-files-found: error
           retention-days: 1
 
+  windows-x64:
+    name: Windows (x64)
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+          submodules: true
+      - name: Setup MSVC environment
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+      - name: Setup GNU make for Win32
+        shell: pwsh
+        run: |
+          choco install make --no-progress -y
+          Add-Content $env:GITHUB_PATH "C:\Program Files\Git\usr\bin"
+      - name: Build
+        shell: cmd
+        run: |
+          make -j4
+          copy bin\hev-fsh.exe fsh-win-x64.exe
+      - name: Upload x64
+        uses: actions/upload-artifact@v7
+        with:
+          name: fsh-win-x64.exe
+          path: fsh-win-x64.exe
+          if-no-files-found: error
+          retention-days: 1
+
+  windows-x86:
+    name: Windows (x86)
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+          submodules: true
+      - name: Setup MSVC environment
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x86
+      - name: Setup GNU make for Win32
+        shell: pwsh
+        run: |
+          choco install make --no-progress -y
+          Add-Content $env:GITHUB_PATH "C:\Program Files\Git\usr\bin"
+      - name: Build
+        shell: cmd
+        run: |
+          make -j4 ARCH=x86
+          copy bin\hev-fsh.exe fsh-win-x86.exe
+      - name: Upload x86
+        uses: actions/upload-artifact@v7
+        with:
+          name: fsh-win-x86.exe
+          path: fsh-win-x86.exe
+          if-no-files-found: error
+          retention-days: 1
+
+  windows-arm64:
+    name: Windows (arm64)
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+          submodules: true
+      - name: Setup MSVC environment
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: amd64_arm64
+      - name: Setup GNU make for Win32
+        shell: pwsh
+        run: |
+          choco install make --no-progress -y
+          Add-Content $env:GITHUB_PATH "C:\Program Files\Git\usr\bin"
+      - name: Build
+        shell: cmd
+        run: |
+          make -j4 ARCH=arm64
+          copy bin\hev-fsh.exe fsh-win-arm64.exe
+      - name: Upload arm64
+        uses: actions/upload-artifact@v7
+        with:
+          name: fsh-win-arm64.exe
+          path: fsh-win-arm64.exe
+          if-no-files-found: error
+          retention-days: 1
+
   release:
     name: Release
     runs-on: ubuntu-latest
     needs:
       - source
       - linux
+      - windows-x64
+      - windows-x86
+      - windows-arm64
     if: github.event_name == 'release'
     steps:
       - name: Checkout

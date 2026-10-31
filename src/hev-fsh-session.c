@@ -7,11 +7,9 @@
  ============================================================================
  */
 
-#include <unistd.h>
 #include <string.h>
-#include <arpa/inet.h>
-#include <netinet/in.h>
 
+#include <hev-sys.h>
 #include <hev-task.h>
 #include <hev-task-io.h>
 #include <hev-task-io-socket.h>
@@ -52,7 +50,8 @@ hev_fsh_session_log (HevFshSession *self, const char *type)
 
     hev_fsh_protocol_token_to_string (self->token, ts);
 
-    res = getpeername (self->client_fd, (struct sockaddr *)&addr, &len);
+    res = hev_task_io_socket_getpeername (self->client_fd,
+                                          (struct sockaddr *)&addr, &len);
     if (res >= 0) {
         if (addr.ss_family == AF_INET) {
             struct sockaddr_in *p = (struct sockaddr_in *)&addr;
@@ -396,9 +395,9 @@ hev_fsh_session_destruct (HevObject *base)
     LOG_D ("%p fsh session destruct", self);
 
     if (self->remote_fd >= 0)
-        close (self->remote_fd);
+        hev_task_io_close (self->remote_fd);
     if (self->client_fd >= 0)
-        close (self->client_fd);
+        hev_task_io_close (self->client_fd);
 
     HEV_FSH_IO_TYPE->destruct (base);
 }

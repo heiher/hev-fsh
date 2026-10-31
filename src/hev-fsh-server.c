@@ -9,9 +9,11 @@
 
 #include <stdlib.h>
 #include <string.h>
-#include <unistd.h>
-#include <netinet/tcp.h>
 
+#include <hev-sys.h>
+#ifdef __linux__
+#include <netinet/tcp.h>
+#endif
 #include <hev-task.h>
 #include <hev-task-io.h>
 #include <hev-task-io-pipe.h>
@@ -47,7 +49,8 @@ hev_fsh_server_task_entry (void *data)
         if (cc) {
 #ifdef __linux__
             int res;
-            res = setsockopt (fd, IPPROTO_TCP, TCP_CONGESTION, cc, strlen (cc));
+            res = hev_task_io_socket_setsockopt (
+                fd, IPPROTO_TCP, TCP_CONGESTION, cc, strlen (cc));
             if (res < 0)
                 LOG_W ("%p fsh server tcp congestion", self);
 #endif
@@ -55,7 +58,7 @@ hev_fsh_server_task_entry (void *data)
 
         s = hev_fsh_session_new (fd, timeout, self->t_mgr, self->s_mgr);
         if (!s) {
-            close (fd);
+            hev_task_io_close (fd);
             continue;
         }
 
@@ -129,7 +132,9 @@ hev_fsh_server_socket (HevFshServer *self, HevFshConfig *config)
 {
     struct sockaddr *addr;
     socklen_t addr_len;
+#if !defined(_WIN32) || defined(SO_REUSEPORT)
     int reuse = 1;
+#endif
     int fd;
 
     addr = hev_fsh_config_get_server_sockaddr (config, &addr_len);
@@ -144,27 +149,34 @@ hev_fsh_server_socket (HevFshServer *self, HevFshConfig *config)
         return -1;
     }
 
-    if (setsockopt (fd, SOL_SOCKET, SO_REUSEADDR, &reuse, sizeof (int)) < 0) {
+#ifndef _WIN32
+    /* On Windows, it allows binding a port that is already in use. */
+    if (hev_task_io_socket_setsockopt (fd, SOL_SOCKET, SO_REUSEADDR, &reuse,
+                                       sizeof (int)) < 0) {
         LOG_E ("%p fsh server socket reuse addr", self);
-        close (fd);
+        hev_task_io_close (fd);
         return -1;
     }
+#endif
 
-    if (setsockopt (fd, SOL_SOCKET, SO_REUSEPORT, &reuse, sizeof (int)) < 0) {
+#ifdef SO_REUSEPORT
+    if (hev_task_io_socket_setsockopt (fd, SOL_SOCKET, SO_REUSEPORT, &reuse,
+                                       sizeof (int)) < 0) {
         LOG_E ("%p fsh server socket reuse port", self);
-        close (fd);
+        hev_task_io_close (fd);
         return -1;
     }
+#endif
 
-    if (bind (fd, addr, addr_len) < 0) {
+    if (hev_task_io_socket_bind (fd, addr, addr_len) < 0) {
         LOG_E ("%p fsh server socket bind", self);
-        close (fd);
+        hev_task_io_close (fd);
         return -1;
     }
 
-    if (listen (fd, 10) < 0) {
+    if (hev_task_io_socket_listen (fd, 10) < 0) {
         LOG_E ("%p fsh server socket listen", self);
-        close (fd);
+        hev_task_io_close (fd);
         return -1;
     }
 
@@ -191,14 +203,14 @@ hev_fsh_server_construct (HevFshServer *self, HevFshConfig *config)
 
     self->main_task = hev_task_new (HEV_FSH_CONFIG_TASK_STACK_SIZE);
     if (!self->main_task) {
-        close (self->fd);
+        hev_task_io_close (self->fd);
         return -1;
     }
 
     self->s_mgr = hev_fsh_session_manager_new ();
     if (!self->s_mgr) {
         hev_task_unref (self->main_task);
-        close (self->fd);
+        hev_task_io_close (self->fd);
         return -1;
     }
 
@@ -208,7 +220,7 @@ hev_fsh_server_construct (HevFshServer *self, HevFshConfig *config)
         if (!self->event_task) {
             hev_object_unref (HEV_OBJECT (self->s_mgr));
             hev_task_unref (self->main_task);
-            close (self->fd);
+            hev_task_io_close (self->fd);
             return -1;
         }
 
@@ -217,7 +229,7 @@ hev_fsh_server_construct (HevFshServer *self, HevFshConfig *config)
             hev_task_unref (self->event_task);
             hev_object_unref (HEV_OBJECT (self->s_mgr));
             hev_task_unref (self->main_task);
-            close (self->fd);
+            hev_task_io_close (self->fd);
             return -1;
         }
         hev_fsh_token_manager_reload (self->t_mgr);
@@ -228,7 +240,7 @@ hev_fsh_server_construct (HevFshServer *self, HevFshConfig *config)
             hev_task_unref (self->event_task);
             hev_object_unref (HEV_OBJECT (self->s_mgr));
             hev_task_unref (self->main_task);
-            close (self->fd);
+            hev_task_io_close (self->fd);
             return -1;
         }
     }
@@ -250,11 +262,11 @@ hev_fsh_server_destruct (HevObject *base)
         hev_object_unref (HEV_OBJECT (self->t_mgr));
     if (self->event_task) {
         hev_task_unref (self->event_task);
-        close (self->pfds[0]);
-        close (self->pfds[1]);
+        hev_task_io_close (self->pfds[0]);
+        hev_task_io_close (self->pfds[1]);
     }
     hev_task_unref (self->main_task);
-    close (self->fd);
+    hev_task_io_close (self->fd);
 
     HEV_FSH_BASE_TYPE->destruct (base);
 }

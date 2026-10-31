@@ -10,6 +10,7 @@ Fsh helps you access local shell and TCP services behind a NAT or firewall.
 * SOCKS5 service.
 * IPv4/IPv6. (dual stack)
 * End-to-end encryption. (Linux only, it depends on kernel TLS)
+* Native Windows support. (Windows 10 1809+, remote shell via ConPTY)
 
 ```
     +-------------+      +-------------+
@@ -48,6 +49,31 @@ git clone --recursive git://github.com/heiher/hev-fsh
 cd hev-fsh
 make
 ```
+
+### Windows (MSVC + Clang)
+
+The same `Makefile` builds natively with clang targeting MSVC. Open a Visual
+Studio developer prompt (clang from the VS LLVM component or `PATH`), make
+sure GNU make and a POSIX `sh.exe` (for example the one of Git for Windows,
+`C:\Program Files\Git\usr\bin`) are on `PATH`, then:
+
+```bat
+git clone --recursive https://github.com/heiher/hev-fsh
+cd hev-fsh
+make
+make ARCH=x86
+make ARCH=arm64
+```
+
+`ARCH` is `x64` (default), `x86` or `arm64` and must match the developer
+prompt architecture. The executable is `bin/hev-fsh.exe`.
+
+On native Windows the remote shell is `%COMSPEC%` (cmd.exe) running in a
+pseudo console, started as the current user (`-u` is ignored), and the
+connector needs a console for its standard input and output. There is no
+end-to-end encryption (`-k`, `-U`), `-c` is ignored, and no reload of the
+tokens file on `SIGUSR1`. Stop a server, forwarder or port/SOCKS5 connector with
+Ctrl+C.
 
 ## How to Run
 

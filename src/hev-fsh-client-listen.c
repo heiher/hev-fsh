@@ -8,8 +8,8 @@
  */
 
 #include <string.h>
-#include <unistd.h>
 
+#include <hev-sys.h>
 #include <hev-task.h>
 #include <hev-task-io.h>
 #include <hev-task-io-socket.h>

@@ -8,8 +8,8 @@
  */
 
 #include <string.h>
-#include <unistd.h>
 
+#include <hev-sys.h>
 #include <hev-task.h>
 #include <hev-task-io.h>
 #include <hev-task-io-socket.h>
@@ -103,7 +103,7 @@ hev_fsh_client_sock_connect_destruct (HevObject *base)
     LOG_D ("%p fsh client sock connect destruct", self);
 
     if (self->fd >= 0)
-        close (self->fd);
+        hev_task_io_close (self->fd);
 
     HEV_FSH_CLIENT_CONNECT_TYPE->destruct (base);
 }

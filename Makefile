@@ -23,10 +23,41 @@ THIRDPARTDIR=third-part
 
 TARGET=$(BINDIR)/hev-fsh
 THIRDPARTS=$(THIRDPARTDIR)/hev-task-system
+EXEEXT=
+
+# Native Windows: clang targeting MSVC, built with the very same rules.
+# Run make from a Visual Studio developer prompt (x64, x86 or arm64) with
+# a POSIX sh.exe on PATH, e.g. Git for Windows:
+#   make ARCH=x64
+ifeq ($(OS),Windows_NT)
+ifeq ($(MSYSTEM),)
+WIN_NATIVE=1
+ARCH?=x64
+CROSS_TARGET_x64=x86_64
+CROSS_TARGET_x86=i686
+CROSS_TARGET_arm64=aarch64
+CC=clang --target=$(CROSS_TARGET_$(ARCH))-pc-windows-msvc
+PP=$(CC)
+STRIP=true
+EXEEXT=.exe
+TARGET=$(BINDIR)/hev-fsh$(EXEEXT)
+CCFLAGS+=-DEXPORT_SYMBOL= -D_CRT_SECURE_NO_WARNINGS -D_CRT_NONSTDC_NO_WARNINGS \
+         -D_WINSOCK_DEPRECATED_NO_WARNINGS -D_WIN32_WINNT=0x0A00 \
+         -DNTDDI_VERSION=0x0A000006 -Wno-microsoft-enum-forward-reference
+LDFLAGS=-L$(THIRDPARTDIR)/hev-task-system/bin -lhev-task-system \
+        -lkernel32 -lws2_32 -lbcrypt
+ifneq ($(ARCH),arm64)
+# Coroutine switching is incompatible with the CET shadow stack.
+LDFLAGS+=-Wl,/CETCOMPAT:NO
+endif
+endif
+endif
 
 -include build.mk
 CCFLAGS+=$(VERSION_CFLAGS)
+ifneq ($(WIN_NATIVE),1)
 TPFLAGS=ENABLE_STACK_OVERFLOW_DETECTOR=1
+endif
 CCSRCS=$(filter %.c,$(SRCFILES))
 ASSRCS=$(filter %.S,$(SRCFILES))
 LDOBJS=$(patsubst $(SRCDIR)/%.c,$(BUILDDIR)/%.o,$(CCSRCS)) \

@@ -8,8 +8,8 @@
  */
 
 #include <string.h>
-#include <unistd.h>
 
+#include <hev-sys.h>
 #include <hev-task.h>
 #include <hev-task-io.h>
 #include <hev-task-io-socket.h>
@@ -88,7 +88,7 @@ hev_fsh_client_port_accept_task_entry (void *data)
         hev_task_io_splice (rfd, rfd, lfd, lfd, 8192, io_yielder, self);
 
 quit_close:
-    close (lfd);
+    hev_task_io_close (lfd);
 quit:
     hev_object_unref (HEV_OBJECT (self));
 }

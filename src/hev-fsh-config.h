@@ -10,7 +10,7 @@
 #ifndef __HEV_FSH_CONFIG_H__
 #define __HEV_FSH_CONFIG_H__
 
-#include <netinet/in.h>
+#include <hev-sys.h>
 
 #define HEV_FSH_CONFIG_TASK_STACK_SIZE (16384)
 

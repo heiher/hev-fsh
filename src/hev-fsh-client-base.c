@@ -9,8 +9,6 @@
 
 #include <stdio.h>
 #include <fcntl.h>
-#include <netdb.h>
-#include <unistd.h>
 #include <string.h>
 #include <signal.h>
 
@@ -19,6 +17,7 @@
 #include <netinet/tcp.h>
 #endif
 
+#include <hev-sys.h>
 #include <hev-task.h>
 #include <hev-task-io.h>
 #include <hev-task-io-socket.h>
@@ -40,18 +39,21 @@
 static int
 hev_fsh_client_base_socket (HevFshClientBase *self, int family)
 {
+#ifndef _WIN32
     int flags;
     int res;
+#endif
     int fd;
 
     fd = hev_task_io_socket_socket (family, SOCK_STREAM, IPPROTO_TCP);
     if (fd < 0)
         return -1;
 
+#ifndef _WIN32
     flags = fcntl (fd, F_GETFD);
     if (flags < 0) {
         LOG_E ("%p fsh client base fcntl", self);
-        close (fd);
+        hev_task_io_close (fd);
         return -1;
     }
 
@@ -59,9 +61,11 @@ hev_fsh_client_base_socket (HevFshClientBase *self, int family)
     res = fcntl (fd, F_SETFD, flags);
     if (res < 0) {
         LOG_E ("%p fsh client base cloexec", self);
-        close (fd);
+        hev_task_io_close (fd);
         return -1;
     }
+
+#endif
 
     return fd;
 }
@@ -71,7 +75,9 @@ hev_fsh_client_base_listen (HevFshClientBase *self)
 {
     struct sockaddr *addr;
     socklen_t addr_len;
+#ifndef _WIN32
     int one = 1;
+#endif
     int res;
     int fd;
 
@@ -85,23 +91,28 @@ hev_fsh_client_base_listen (HevFshClientBase *self)
     if (fd < 0)
         return -1;
 
-    res = setsockopt (fd, SOL_SOCKET, SO_REUSEADDR, &one, sizeof (one));
+#ifndef _WIN32
+    /* On Windows, it allows binding a port that is already in use. */
+    res = hev_task_io_socket_setsockopt (fd, SOL_SOCKET, SO_REUSEADDR, &one,
+                                         sizeof (one));
     if (res < 0) {
         LOG_E ("%p fsh client base reuse", self);
+        hev_task_io_close (fd);
         return -1;
     }
+#endif
 
-    res = bind (fd, addr, addr_len);
+    res = hev_task_io_socket_bind (fd, addr, addr_len);
     if (res < 0) {
         LOG_E ("%p fsh client base bind", self);
-        close (fd);
+        hev_task_io_close (fd);
         return -1;
     }
 
-    res = listen (fd, 10);
+    res = hev_task_io_socket_listen (fd, 10);
     if (res < 0) {
         LOG_E ("%p fsh client base listen", self);
-        close (fd);
+        hev_task_io_close (fd);
         return -1;
     }
 
@@ -133,7 +144,8 @@ hev_fsh_client_base_connect (HevFshClientBase *self)
     cc = hev_fsh_config_get_tcp_cc (self->config);
     if (cc) {
 #ifdef __linux__
-        res = setsockopt (fd, IPPROTO_TCP, TCP_CONGESTION, cc, strlen (cc));
+        res = hev_task_io_socket_setsockopt (fd, IPPROTO_TCP, TCP_CONGESTION,
+                                             cc, strlen (cc));
         if (res < 0)
             LOG_W ("%p fsh client base tcp congestion", self);
 #endif
@@ -144,7 +156,7 @@ hev_fsh_client_base_connect (HevFshClientBase *self)
     res = hev_task_io_socket_connect (fd, addr, addr_len, io_yielder, self);
     if (res < 0) {
         LOG_E ("%p fsh client base connect", self);
-        close (fd);
+        hev_task_io_close (fd);
         return -1;
     }
 
@@ -179,13 +191,15 @@ hev_fsh_client_base_encrypt (HevFshClientBase *self)
     if (res <= 0)
         return -1;
 
-    res = setsockopt (self->fd, SOL_TCP, TCP_ULP, "tls", sizeof ("tls"));
+    res = hev_task_io_socket_setsockopt (self->fd, SOL_TCP, TCP_ULP, "tls",
+                                         sizeof ("tls"));
     if (res < 0) {
         LOG_E ("%p fsh client base tls (modprobe tls)", self);
         return -1;
     }
 
-    res = setsockopt (self->fd, SOL_TLS, TLS_TX, &ci, sizeof (ci));
+    res = hev_task_io_socket_setsockopt (self->fd, SOL_TLS, TLS_TX, &ci,
+                                         sizeof (ci));
     if (res < 0)
         return -1;
 
@@ -194,7 +208,8 @@ hev_fsh_client_base_encrypt (HevFshClientBase *self)
     if (res != sizeof (ci.iv))
         return -1;
 
-    res = setsockopt (self->fd, SOL_TLS, TLS_RX, &ci, sizeof (ci));
+    res = hev_task_io_socket_setsockopt (self->fd, SOL_TLS, TLS_RX, &ci,
+                                         sizeof (ci));
     if (res < 0)
         return -1;
 
@@ -219,7 +234,9 @@ hev_fsh_client_base_construct (HevFshClientBase *self, HevFshConfig *config)
 
     self->fd = -1;
     self->config = config;
+#ifdef SIGCHLD
     signal (SIGCHLD, SIG_IGN);
+#endif
 
     return 0;
 }
@@ -232,7 +249,7 @@ hev_fsh_client_base_destruct (HevObject *base)
     LOG_D ("%p fsh client base destruct", self);
 
     if (self->fd >= 0)
-        close (self->fd);
+        hev_task_io_close (self->fd);
 
     HEV_FSH_IO_TYPE->destruct (base);
 }

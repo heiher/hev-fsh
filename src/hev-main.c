@@ -12,14 +12,16 @@
 #include <stdlib.h>
 #include <signal.h>
 #include <string.h>
-#include <unistd.h>
-#include <arpa/inet.h>
-#include <sys/socket.h>
-#include <sys/resource.h>
 
+#include <hev-sys.h>
 #include <hev-socks5-misc.h>
 #include <hev-task-system.h>
 
+#ifndef _WIN32
+#include <sys/resource.h>
+#endif
+
+#include "hev-compat.h"
 #include "hev-logger.h"
 #include "hev-fsh-config.h"
 #include "hev-fsh-server.h"
@@ -525,9 +527,11 @@ signal_handler (int signum)
         return;
 
     switch (signum) {
+#ifdef SIGUSR1
     case SIGUSR1:
         hev_fsh_base_reload (instance);
         break;
+#endif
     default:
         hev_fsh_base_stop (instance);
     }
@@ -536,12 +540,14 @@ signal_handler (int signum)
 static void
 set_limit_nofile (void)
 {
+#ifndef _WIN32
     struct rlimit limit = {
         .rlim_cur = 65536,
         .rlim_max = 65536,
     };
 
     setrlimit (RLIMIT_NOFILE, &limit);
+#endif
 }
 
 int
@@ -580,14 +586,18 @@ main (int argc, char *argv[])
     hev_socks5_set_tcp_timeout (timeout);
     hev_socks5_set_udp_timeout (timeout);
 
+#ifdef SIGPIPE
     if (signal (SIGPIPE, SIG_IGN) == SIG_ERR)
         return -1;
+#endif
     if (signal (SIGINT, signal_handler) == SIG_ERR)
         return -1;
     if (signal (SIGTERM, signal_handler) == SIG_ERR)
         return -1;
+#ifdef SIGUSR1
     if (signal (SIGUSR1, signal_handler) == SIG_ERR)
         return -1;
+#endif
 
     if (HEV_FSH_CONFIG_MODE_SERVER == mode)
         instance = hev_fsh_server_new (config);

@@ -9,12 +9,28 @@
 
 #include <errno.h>
 
+#include <hev-sys.h>
+
 #include <hev-task.h>
 #include <hev-task-io.h>
 #include <hev-task-io-socket.h>
 #include <hev-circular-buffer.h>
 
 #include "hev-task-io-us.h"
+
+#ifdef _WIN32
+
+/* The userspace TLS is Linux only, so a plain splice is enough. */
+void
+hev_task_io_us_splice (int fd_a_i, int fd_a_o, int fd_b_i, int fd_b_o,
+                       size_t buf_size, HevTaskIOYielder yielder,
+                       void *yielder_data)
+{
+    hev_task_io_splice (fd_a_i, fd_a_o, fd_b_i, fd_b_o, buf_size, yielder,
+                        yielder_data);
+}
+
+#else
 
 typedef struct _HevTaskIOSplicer HevTaskIOSplicer;
 
@@ -120,3 +136,5 @@ hev_task_io_us_splice (int fd_a_i, int fd_a_o, int fd_b_i, int fd_b_o,
 exit:
     task_io_splicer_fini (&splicer_f);
 }
+
+#endif

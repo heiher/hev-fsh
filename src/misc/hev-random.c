@@ -7,13 +7,32 @@
  ============================================================================
  */
 
+#ifdef _WIN32
+
+#include <windows.h>
+#include <bcrypt.h>
+
+#else
+
 #include <fcntl.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <unistd.h>
 #include <sys/time.h>
 
+#endif
+
 #include "hev-random.h"
+
+#ifdef _WIN32
+
+void
+hev_random_get_bytes (void *buf, size_t size)
+{
+    BCryptGenRandom (NULL, buf, size, BCRYPT_USE_SYSTEM_PREFERRED_RNG);
+}
+
+#else
 
 void
 hev_random_get_bytes (void *buf, size_t size)
@@ -62,3 +81,5 @@ hev_random_get_bytes (void *buf, size_t size)
     for (i = 0; i < size; i++)
         *cp++ = (rand () >> 7) & 0xFF;
 }
+
+#endif

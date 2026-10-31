@@ -8,8 +8,8 @@
  */
 
 #include <string.h>
-#include <unistd.h>
 
+#include <hev-sys.h>
 #include <hev-task.h>
 #include <hev-task-io.h>
 #include <hev-task-io-socket.h>
@@ -30,7 +30,7 @@ hev_fsh_client_sock_listen_dispatch (HevFshClientListen *base, int fd)
     if (client)
         hev_fsh_io_run (HEV_FSH_IO (client));
     else
-        close (fd);
+        hev_task_io_close (fd);
 }
 
 HevFshClientBase *
