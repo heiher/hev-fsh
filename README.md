@@ -71,8 +71,9 @@ prompt architecture. The executable is `bin/hev-fsh.exe`.
 On native Windows the remote shell is `%COMSPEC%` (cmd.exe) running in a
 pseudo console, started as the current user (`-u` is ignored), and the
 connector needs a console for its standard input and output. There is no
-end-to-end encryption (`-k`, `-U`), `-c` is ignored, and no reload of the
-tokens file on `SIGUSR1`. Stop a server, forwarder or port/SOCKS5 connector with
+end-to-end encryption (`-k`, `-U`) and `-c` is ignored. `SIGUSR1` is replaced
+by a named event, see [Live updating tokens file](#live-updating-tokens-file).
+Stop a server, forwarder or port/SOCKS5 connector with
 Ctrl+C.
 
 ## How to Run
@@ -193,6 +194,22 @@ fsh -f -p -w 127.0.0.1:22,[::1]:22 127.0.0.1/8b9bf4e7-b2b2-4115-ac97-0c7f69433bc
 fsh -p [::1]:22 127.0.0.1/8b9bf4e7-b2b2-4115-ac97-0c7f69433bc4
 fsh -p 2200:[::1]:22 127.0.0.1/8b9bf4e7-b2b2-4115-ac97-0c7f69433bc4
 fsh -p [::1]:2200:[::1]:22 127.0.0.1/8b9bf4e7-b2b2-4115-ac97-0c7f69433bc4
+```
+
+### Live updating tokens file
+
+Send signal `SIGUSR1` to the server process after the tokens file is updated:
+
+```bash
+killall -SIGUSR1 fsh
+```
+
+On Windows, signal the named event `Local\hev-fsh-reload-<pid>` instead, for
+example from PowerShell:
+
+```powershell
+$pid_ = (Get-Process hev-fsh).Id
+[Threading.EventWaitHandle]::OpenExisting("Local\hev-fsh-reload-$pid_").Set()
 ```
 
 ### OpenWrt 24.10+

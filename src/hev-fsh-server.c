@@ -7,6 +7,7 @@
  ============================================================================
  */
 
+#include <errno.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -24,6 +25,13 @@
 #include "hev-fsh-session.h"
 
 #include "hev-fsh-server.h"
+
+/* Never waits, for use outside of the task context (signal, other threads). */
+static int
+hev_task_io_nowait (HevTaskYieldType type, void *data)
+{
+    return -1;
+}
 
 static void
 hev_fsh_server_task_entry (void *data)
@@ -69,6 +77,21 @@ hev_fsh_server_task_entry (void *data)
 static void
 hev_fsh_event_task_entry (void *data)
 {
+    HevFshServer *self = HEV_FSH_SERVER (data);
+
+    hev_task_add_fd (hev_task_self (), self->pfds[0], POLLIN);
+
+    for (;;) {
+        char buf[16];
+        int res;
+
+        res = hev_task_io_read (self->pfds[0], buf, sizeof (buf), NULL, NULL);
+        if (res < 0)
+            break;
+
+        if (self->t_mgr)
+            hev_fsh_token_manager_reload (self->t_mgr);
+    }
 }
 
 HevFshBase *
@@ -120,11 +143,15 @@ void
 hev_fsh_server_reload (HevFshBase *base)
 {
     HevFshServer *self = HEV_FSH_SERVER (base);
+    int err = errno;
+    char val = 'r';
 
-    LOG_D ("%p fsh clinet reload", base);
+    /* May run in a signal handler or another thread, defer to event task. */
+    if (self->event_task)
+        hev_task_io_write (self->pfds[1], &val, sizeof (val),
+                           hev_task_io_nowait, NULL);
 
-    if (self->t_mgr)
-        hev_fsh_token_manager_reload (self->t_mgr);
+    errno = err;
 }
 
 static int

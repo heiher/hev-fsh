@@ -537,6 +537,67 @@ signal_handler (int signum)
     }
 }
 
+#ifdef HEV_WIN_NATIVE
+/*
+ * Windows has no SIGUSR1, a named event "Local\hev-fsh-reload-<pid>" is used
+ * instead. Signal it, for example from PowerShell:
+ *   [Threading.EventWaitHandle]::OpenExisting(
+ *       "Local\hev-fsh-reload-<pid>").Set()
+ */
+static HANDLE reload_events[2];
+static HANDLE reload_thread;
+
+static DWORD WINAPI
+reload_thread_handler (LPVOID data)
+{
+    while (WaitForMultipleObjects (2, reload_events, FALSE, INFINITE) ==
+           WAIT_OBJECT_0)
+        hev_fsh_base_reload (instance);
+
+    return 0;
+}
+
+static void
+reload_event_init (void)
+{
+    char name[64];
+
+    snprintf (name, sizeof (name), "Local\\hev-fsh-reload-%lu",
+              GetCurrentProcessId ());
+    reload_events[0] = CreateEventA (NULL, FALSE, FALSE, name);
+    reload_events[1] = CreateEventA (NULL, TRUE, FALSE, NULL);
+    if (reload_events[0] && reload_events[1]) {
+        reload_thread =
+            CreateThread (NULL, 0, reload_thread_handler, NULL, 0, NULL);
+        if (reload_thread)
+            return;
+    }
+
+    LOG_W ("reload event");
+    if (reload_events[0])
+        CloseHandle (reload_events[0]);
+    if (reload_events[1])
+        CloseHandle (reload_events[1]);
+    reload_events[0] = NULL;
+    reload_events[1] = NULL;
+}
+
+static void
+reload_event_fini (void)
+{
+    if (!reload_events[1])
+        return;
+
+    SetEvent (reload_events[1]);
+    WaitForSingleObject (reload_thread, INFINITE);
+    CloseHandle (reload_thread);
+    CloseHandle (reload_events[0]);
+    CloseHandle (reload_events[1]);
+    reload_events[0] = NULL;
+    reload_events[1] = NULL;
+}
+#endif
+
 static void
 set_limit_nofile (void)
 {
@@ -608,8 +669,15 @@ main (int argc, char *argv[])
         return -1;
 
     hev_fsh_base_start (instance);
+#ifdef HEV_WIN_NATIVE
+    if (HEV_FSH_CONFIG_MODE_SERVER == mode)
+        reload_event_init ();
+#endif
 
     hev_task_system_run ();
+#ifdef HEV_WIN_NATIVE
+    reload_event_fini ();
+#endif
 
     hev_object_unref (HEV_OBJECT (instance));
     hev_fsh_config_destroy (config);
