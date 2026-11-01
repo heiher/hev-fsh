@@ -31,6 +31,22 @@
 
 #include "hev-fsh-client-term-connect.h"
 
+/* The terminal input never reaches EOF, so the splice would wait for a key
+ * after the remote shell exits. End the session once the peer closed. */
+static int
+hev_fsh_client_term_connect_yielder (HevTaskYieldType type, void *data)
+{
+    HevFshClientBase *base = data;
+    char c;
+
+    if (type == HEV_TASK_WAITIO) {
+        if (recv (base->fd, &c, 1, MSG_PEEK) == 0)
+            return -1;
+    }
+
+    return io_yielder (type, data);
+}
+
 #ifdef _WIN32
 
 #ifndef ENABLE_VIRTUAL_TERMINAL_INPUT
@@ -131,7 +147,8 @@ hev_fsh_client_term_connect_task_entry (void *data)
     }
 
     hev_task_add_fd (hev_task_self (), cfd, POLLIN | POLLOUT);
-    hev_task_io_splice (fd, fd, cfd, cfd, 8192, io_yielder, self);
+    hev_task_io_splice (fd, fd, cfd, cfd, 8192,
+                        hev_fsh_client_term_connect_yielder, self);
 
     hev_task_io_close (cfd);
     console_restore ();
@@ -194,9 +211,11 @@ hev_fsh_client_term_connect_task_entry (void *data)
         goto exit;
 
     if (hev_fsh_config_is_ugly_ktls (base->config))
-        hev_task_io_us_splice (fd, fd, 0, 1, 8192, io_yielder, self);
+        hev_task_io_us_splice (fd, fd, 0, 1, 8192,
+                               hev_fsh_client_term_connect_yielder, self);
     else
-        hev_task_io_splice (fd, fd, 0, 1, 8192, io_yielder, self);
+        hev_task_io_splice (fd, fd, 0, 1, 8192,
+                            hev_fsh_client_term_connect_yielder, self);
 
     tcsetattr (0, TCSADRAIN, &term);
 
