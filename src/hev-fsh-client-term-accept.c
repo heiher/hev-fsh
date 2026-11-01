@@ -50,7 +50,8 @@ struct _HevPtyProc
     HANDLE proc;
 };
 
-/* Close the pseudo console once the shell exits, this ends the output too. */
+/* Close the pseudo console once the shell exits, this ends the output too.
+ * It owns the pp, so it must be started as soon as the shell is created. */
 static DWORD WINAPI
 hev_pty_proc_waiter (LPVOID data)
 {
@@ -181,7 +182,7 @@ hev_fsh_client_term_accept_task_entry (void *data)
     HevTaskCallPtyProc *ppc;
     HevTaskCall *call;
     HevPtyProc *pp;
-    HANDLE in, out, t;
+    HANDLE in, out, proc, t;
     void *ptr;
     int sfd;
     int pfd;
@@ -223,25 +224,43 @@ hev_fsh_client_term_accept_task_entry (void *data)
         goto quit;
     }
 
+    /* Keep our own handle, the waiter owns pp from now on. */
+    if (!DuplicateHandle (GetCurrentProcess (), pp->proc, GetCurrentProcess (),
+                          &proc, 0, FALSE, DUPLICATE_SAME_ACCESS))
+        proc = NULL;
+
+    /* Release the pseudo console when the shell exits, even by itself. */
+    t = CreateThread (NULL, 0, hev_pty_proc_waiter, pp, 0, NULL);
+    if (!t) {
+        TerminateProcess (pp->proc, 0);
+        WaitForSingleObject (pp->proc, INFINITE);
+        ClosePseudoConsole (pp->pty);
+        CloseHandle (pp->proc);
+        free (pp);
+        CloseHandle (in);
+        CloseHandle (out);
+        if (proc)
+            CloseHandle (proc);
+        goto quit;
+    }
+    CloseHandle (t);
+
     pfd = hev_bridge_new (in, out,
                           HEV_BRIDGE_OWN | HEV_BRIDGE_LF2CR | HEV_BRIDGE_DRAIN);
     if (pfd < 0) {
         CloseHandle (in);
         CloseHandle (out);
-        TerminateProcess (pp->proc, 0);
-        goto quit_wait;
+    } else {
+        hev_task_add_fd (hev_task_self (), pfd, POLLIN | POLLOUT);
+        hev_task_io_splice (sfd, sfd, pfd, pfd, 8192, io_yielder, self);
+        hev_task_io_close (pfd);
     }
 
-    hev_task_add_fd (hev_task_self (), pfd, POLLIN | POLLOUT);
-    hev_task_io_splice (sfd, sfd, pfd, pfd, 8192, io_yielder, self);
-    hev_task_io_close (pfd);
-
-    /* Kill the shell, then its waiter releases the pseudo console. */
-    TerminateProcess (pp->proc, 0);
-quit_wait:
-    t = CreateThread (NULL, 0, hev_pty_proc_waiter, pp, 0, NULL);
-    if (t)
-        CloseHandle (t);
+    /* Kill the shell if still alive, then its waiter releases the console. */
+    if (proc) {
+        TerminateProcess (proc, 0);
+        CloseHandle (proc);
+    }
 quit:
     hev_object_unref (HEV_OBJECT (self));
 }
