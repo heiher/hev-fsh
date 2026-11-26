@@ -38,6 +38,13 @@ hev_socks5_server_us_tcp_splicer (HevSocks5TCP *tcp, int fd)
     if (res < 0)
         hev_task_mod_fd (task, fd, POLLIN | POLLOUT);
 
+    res = hev_socks5_socket_set_nodelay (cfd);
+    if (res < 0)
+        LOG_D ("%p socks5 server us tcp splicer nodelay fd %d", tcp, cfd);
+    res = hev_socks5_socket_set_nodelay (fd);
+    if (res < 0)
+        LOG_D ("%p socks5 server us tcp splicer nodelay fd %d", tcp, fd);
+
     hev_task_io_us_splice (cfd, cfd, fd, fd, 8192, task_io_yielder, tcp);
 
     return 0;
