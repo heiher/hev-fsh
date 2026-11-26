@@ -10,11 +10,11 @@
 #include <errno.h>
 #include <stdlib.h>
 #include <string.h>
-
-#include <hev-sys.h>
-#ifdef __linux__
+#ifndef _WIN32
 #include <netinet/tcp.h>
 #endif
+
+#include <hev-sys.h>
 #include <hev-task.h>
 #include <hev-task-io.h>
 #include <hev-task-io-pipe.h>
@@ -45,6 +45,7 @@ hev_fsh_server_task_entry (void *data)
     for (;;) {
         HevFshSession *s;
         const char *cc;
+        int one = 1;
         int fd;
 
         fd = hev_task_io_socket_accept (self->fd, NULL, NULL, NULL, NULL);
@@ -52,6 +53,10 @@ hev_fsh_server_task_entry (void *data)
             LOG_W ("%p fsh server accept", self);
             continue;
         }
+
+        if (hev_task_io_socket_setsockopt (fd, IPPROTO_TCP, TCP_NODELAY, &one,
+                                           sizeof (one)) < 0)
+            LOG_D ("%p fsh server nodelay fd %d", self, fd);
 
         cc = hev_fsh_config_get_tcp_cc (self->config);
         if (cc) {

@@ -8,6 +8,9 @@
  */
 
 #include <string.h>
+#ifndef _WIN32
+#include <netinet/tcp.h>
+#endif
 
 #include <hev-sys.h>
 #include <hev-task.h>
@@ -28,6 +31,7 @@ hev_fsh_client_port_accept_task_entry (void *data)
     HevFshMessagePortInfo mpinfo;
     struct sockaddr_storage addr;
     socklen_t addr_len;
+    int one = 1;
     int lfd;
     int rfd;
     int res;
@@ -74,6 +78,11 @@ hev_fsh_client_port_accept_task_entry (void *data)
     lfd = hev_task_io_socket_socket (addr.ss_family, SOCK_STREAM, IPPROTO_TCP);
     if (lfd < 0)
         goto quit;
+
+    res = hev_task_io_socket_setsockopt (lfd, IPPROTO_TCP, TCP_NODELAY, &one,
+                                         sizeof (one));
+    if (res < 0)
+        LOG_D ("%p fsh client port accept nodelay fd %d", self, lfd);
 
     hev_task_add_fd (hev_task_self (), lfd, POLLIN | POLLOUT);
 

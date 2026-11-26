@@ -8,6 +8,9 @@
  */
 
 #include <string.h>
+#ifndef _WIN32
+#include <netinet/tcp.h>
+#endif
 
 #include <hev-sys.h>
 #include <hev-task.h>
@@ -34,11 +37,17 @@ hev_fsh_client_listen_task_entry (void *data)
     }
 
     for (;;) {
+        int one = 1;
         int fd;
 
         fd = hev_task_io_socket_accept (base->fd, NULL, NULL, NULL, NULL);
         if (fd < 0)
             continue;
+
+        res = hev_task_io_socket_setsockopt (fd, IPPROTO_TCP, TCP_NODELAY, &one,
+                                             sizeof (one));
+        if (res < 0)
+            LOG_D ("%p fsh client listen nodelay fd %d", base, fd);
 
         klass->dispatch (self, fd);
     }

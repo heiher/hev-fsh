@@ -11,10 +11,12 @@
 #include <fcntl.h>
 #include <string.h>
 #include <signal.h>
+#ifndef _WIN32
+#include <netinet/tcp.h>
+#endif
 
 #ifdef __linux__
 #include <linux-tls.h>
-#include <netinet/tcp.h>
 #endif
 
 #include <hev-sys.h>
@@ -128,6 +130,7 @@ hev_fsh_client_base_connect (HevFshClientBase *self)
     struct sockaddr *addr;
     socklen_t addr_len;
     const char *cc;
+    int one = 1;
     int res;
     int fd;
 
@@ -140,6 +143,11 @@ hev_fsh_client_base_connect (HevFshClientBase *self)
     fd = hev_fsh_client_base_socket (self, addr->sa_family);
     if (fd < 0)
         return -1;
+
+    res = hev_task_io_socket_setsockopt (fd, IPPROTO_TCP, TCP_NODELAY, &one,
+                                         sizeof (one));
+    if (res < 0)
+        LOG_D ("%p fsh client base nodelay fd %d", self, fd);
 
     cc = hev_fsh_config_get_tcp_cc (self->config);
     if (cc) {
